@@ -206,6 +206,8 @@
   @keyframes wlin{from{transform:translateX(-20px);opacity:0}to{transform:none;opacity:1}}
   @media (max-width:760px){.boardrow{grid-template-columns:1fr}.winlog{order:2;margin-top:0}.wl{min-height:0;grid-template-rows:none}}
   #denomRow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .stats em{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:1px}
+  #sNet.up{color:var(--green)} #sNet.down{color:var(--red)}
   aside{display:flex;flex-direction:column;gap:12px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
   .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -349,10 +351,10 @@
       <div class="panel">
         <h3>Session</h3>
         <div class="stats">
+          <div><span>Money in</span><b id="sIn">$0.00</b><em id="sInNote"></em></div>
+          <div><span>Net</span><b id="sNet">$0.00</b><em id="sNetNote"></em></div>
           <div><span>Games</span><b id="sGames">0</b></div>
           <div><span>Biggest win</span><b id="sBest">0</b></div>
-          <div><span>Wagered</span><b id="sBet">0</b></div>
-          <div><span>Won</span><b id="sWon">0</b></div>
         </div>
         <div class="row" style="margin-top:10px;justify-content:space-between">
           <label class="chk" style="font-size:13px"><input type="checkbox" id="sound" checked> Sound</label>
@@ -395,7 +397,7 @@
 
   const S = {
     credits: store.get('cents', START),
-    stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0}),
+    stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0,buyin:START}),
     denom: store.get('denom', 25), mult: store.get('mult', 1),
     speed: store.get('speed', 'Normal'),
     wins: store.get('wins', []), sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
@@ -404,6 +406,8 @@
   };
   if (!(S.speed in SPEEDS)) S.speed = 'Normal';
   if (!(S.credits > 0)) S.credits = START;
+  // Money in = starting $100 + every top-up. Older saves didn't track it, so work it out: balance = money in − bet + won
+  if (!(S.stats.buyin > 0)) S.stats.buyin = Math.max(START, Math.round((S.credits + S.stats.bet - S.stats.won) / 10000) * 10000);
   if (!DENOMS.includes(S.denom)) S.denom = 25;
   if (!(S.mult >= 1 && S.mult <= 4)) S.mult = 1;
   // One bet for every card: denomination × credits per card (in cents)
@@ -862,8 +866,12 @@
       ? 'Marks you make on any card are copied to all four.'
       : 'Each card has its own numbers. Click a card to select it for Quick Pick and Clear.';
     $('sGames').textContent = S.stats.games.toLocaleString();
-    $('sBet').textContent = money(S.stats.bet);
-    $('sWon').textContent = money(S.stats.won);
+    const inn = S.stats.buyin, added = inn - START, net = S.credits - inn;
+    $('sIn').textContent = money(inn);
+    $('sInNote').textContent = added > 0 ? `started ${money(START)} + ${money(added)} added` : `starting balance`;
+    $('sNet').textContent = (net > 0 ? '+' : net < 0 ? '−' : '') + money(Math.abs(net));
+    $('sNet').className = net > 0 ? 'up' : net < 0 ? 'down' : '';
+    $('sNetNote').textContent = net > 0 ? 'ahead of money in' : net < 0 ? 'behind money in' : 'even';
     $('sBest').textContent = money(S.stats.best);
   };
 
@@ -1192,14 +1200,14 @@
   });
   $('addBtn').addEventListener('click', () => {
     if (S.playing) return;
-    S.credits += 10000; store.set('cents', S.credits);
+    S.credits += 10000; S.stats.buyin += 10000; store.set('cents', S.credits); store.set('stats_usd', S.stats);
     [660, 880].forEach((f, i) => setTimeout(() => beep(f, 0.08, 'triangle', 0.06), i * 70));
     const m = $('credits').parentElement; m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
     say(`Added $100.00 — balance ${money(S.credits)}.`); render();
   });
   $('resetBtn').addEventListener('click', () => {
     if (S.playing || S.autoLeft) return;
-    S.credits = START; S.stats = {games:0,bet:0,won:0,best:0}; S.wins = []; store.set('wins', S.wins);
+    S.credits = START; S.stats = {games:0,bet:0,won:0,best:0,buyin:START}; S.wins = []; store.set('wins', S.wins);
     store.set('cents', S.credits); store.set('stats_usd', S.stats);
     clearResults(); say(`Balance reset to ${money(START)}.`); render();
   });
