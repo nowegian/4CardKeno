@@ -8,25 +8,33 @@ A single-page 4-Card Keno game. Open `index.html` in any browser — no build st
 - Each card is paid independently from the pay table × its bet.
 - Quick Pick, auto play (5–100 games), draw speeds, sound, and session stats.
 
-## Master Wheel strategy
-Mark any numbers you like on all four cards — B, C and D don't have to be clustered with Card A. The game reads your four cards as a wheel:
+## Smart Charts strategy
+Built from the *Mystic Keno Smart Charts™ – Four Card Keno Edition* (TheMysticGambler.com). Pick a chart, enter your base numbers (any numbers, in order #1, #2, …) by clicking the **Master** tab, and Cards A–D fill automatically, skipping each chart's blacked-out boxes.
 
-- **Covered numbers** = every number on at least one card.
-- Numbers are lettered from each card's drops in order (Card A's left-out numbers are A, B…, then Card B's, C's, D's), with **anchors** (on every card) last.
-- It checks whether the cards form a standard wheel:
+| Chart | Base numbers | Blacked out on A / B / C / D |
+|---|---|---|
+| 3 Spot | 5 | 2,3 / 4,5 / 1,4 / 3,5 |
+| 4 Spot | 6 | 2,3 / 5,6 / 1,4 / 3,5 |
+| 5 Spot | 7 | 2,3 / 6,7 / 1,4 / 3,5 |
+| 6 Spot | 8 | 2,3 / 6,7 / 1,4 / 5,8 |
+| 7 Spot | 9 | 1,2 / 5,6 / 8,9 / 3,7 |
+| 8 Spot | 10 | 1,2 / 5,6 / 8,9 / 3,7 |
+| 9 Spot | 11 | 2,11 / 5,6 / 8,9 / 3,10 |
+| 10 Spot | 12 | 4,11 / 5,12 / 8,9 / 1,10 |
+| Condensed 3 Spot | 4 | 2 / 3 / 1 / 4 |
+| Condensed 4 Spot | 5 | 2 / 3 / 1 / 5 |
+| Condensed 5 Spot | 6 | 2 / 6 / 1 / 5 |
+| Condensed 6 Spot | 7 | 2 / 6 / 1 / 5 |
+| Condensed 7 Spot | 8 | 2 / 6 / 1 / 7 |
+| Condensed 8 Spot | 9 | 1 / 5 / 7 / 9 |
+| Condensed 9 Spot | 10 | 3 / 1 / 7 / 9 |
+| Condensed 10 Spot | 11 | 3 / 1 / 7 / 11 |
+| 5 Spots over 4 Spots | 6 | 5 / 2 / 1,3 / 4,6 |
+| 7 Spots over 6 Spots | 8 | 6 / 2 / 1,3 / 5,7 |
 
-| Variant | Each card | Covers | Each card leaves out | Anchors |
-|---|---|---|---|---|
-| 3-Spot | 3 | 4 | 1 (A / B / C / D) | — |
-| 5-Spot | 5 | 6 | 1 (A / B / C / D) | 2 |
-| 7-Spot | 7 | 9 | 2 (A+B / C+D / E+F / G+H) | 1 |
-| 9-Spot | 9 | 11 | 2 (A+B / C+D / E+F / G+H) | 3 |
+Quick Pick base can scatter numbers in a zone, build **triplets** (groups of 3 touching numbers, from the booklet's tips) or a tight cluster. You can also choose "None" and mark the four cards yourself.
 
-Example 7-spot wheel: A `53 54 62 63 71 73 74`, B `44 52 53 54 71 73 74`, C `44 52 53 54 62 63 71`, D `44 52 54 62 63 73 74` → covers 9, anchor 54.
-
-A **Master** tab shows all four cards combined: a number shared by 2 or more cards shows a gold `*`, a number on only one card shows that card's letter in its color (A red, B green, C blue, D yellow).
-
-There's also a helper that fills B–D from Card A by adding the cover numbers, which you can then edit.
+The **Master** tab shows all four cards combined: a number shared by 2 or more cards shows a gold `*`, a number on only one card shows that card's letter in its color (A red, B green, C blue, D yellow), and base numbers show their position (#1…).
 
 The game shows an exact guarantee table (computed over every way each master catch can happen), a per-round breakdown, and a JSON export of the setup.
 

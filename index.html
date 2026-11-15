@@ -63,6 +63,20 @@
   .n.m.mhit .mn{color:#7a3b00}
   .n.m.mhit .ml.star{color:#3a1d00}
   .n.m.mhit .ml span{text-shadow:0 0 2px #000,0 0 3px #000,0 0 4px #000}
+  .n.m.pick{cursor:pointer}
+  .n.m.pick:hover{box-shadow:inset 0 0 0 2px #ffffff55}
+  .n.m .mp{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:800;color:#ff7a8a}
+  .n.m.mhit .mp{color:#7a1020}
+  table.chart{width:auto;border-collapse:separate;border-spacing:4px;margin:8px auto 0}
+  table.chart th{font-size:13px;color:var(--muted);text-align:center;padding:0 2px;font-weight:800}
+  table.chart tr:first-child th{font-size:15px;color:var(--text)}
+  table.chart td{width:36px;height:30px;min-width:36px;text-align:center;font-weight:700;font-size:13px;background:#fff;color:#111;border:2px solid #555;border-radius:3px;padding:0}
+  table.chart tr.baserow td{background:#d9d9e3}
+  table.chart tr.baserow td.open{background:#d9d9e366;border-style:dashed}
+  table.chart tr.baserow td[data-pos]{cursor:pointer}
+  table.chart td.blk{background:#111;border-color:#111}
+  table.chart td.hitc{background:var(--gold);border-color:var(--gold2)}
+  table.chart td.sz{background:none;border:none;color:var(--muted);font-size:11px;width:auto;min-width:0}
   .mwins{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
   .mwins .mw{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;padding:5px 8px;font-size:12px;background:#0006;display:flex;justify-content:space-between;align-items:center;gap:6px}
   .mwins .mw b.l{color:var(--c);font-family:Bungee,sans-serif;font-weight:400}
@@ -201,6 +215,11 @@
 
   <div class="layout">
     <div class="main"><div class="strip" id="strip"></div><div class="ctabs" id="ctabs" role="tablist"></div><div class="cards" id="cards"></div>
+      <div class="panel" id="chartPanel" hidden>
+        <h3 id="chTitle"></h3>
+        <div class="help" id="chDesc"></div>
+        <div class="tscroll"><table class="chart" id="chTable"></table></div>
+      </div>
       <div class="panel report" id="report" hidden>
         <h3>Strategy breakdown</h3>
         <div id="repHead"></div>
@@ -249,24 +268,27 @@
       </div>
 
       <div class="panel">
-        <h3>Master Wheel strategy</h3>
-                <div id="tab-ms">
-          <div class="field">Variant<select id="msVar">
-            <option value="3">3-Spot · 4-number master</option><option value="5">5-Spot · 6-number master</option>
-            <option value="7" selected>7-Spot · 9-number master</option><option value="9">9-Spot · 11-number master</option></select></div>
-          <div class="field">Your numbers<select id="msZone">
-            <option value="mine" selected>My picks on Card A</option>
-            <option value="example">Example</option><option value="tl">Top-Left zone</option><option value="tr">Top-Right zone</option>
-            <option value="bl">Bottom-Left zone</option><option value="br">Bottom-Right zone</option><option value="ct">Center zone</option>
-            <option value="rand">Random quadrant</option><option value="any">Anywhere</option></select></div>
-          <div class="field" id="msExtraRow">Added numbers<select id="msExtra"><option value="near" selected>Near my picks (random shape)</option><option value="touch">Touching my picks</option><option value="rand">Anywhere on the board</option></select></div>
-          <div class="field" id="msShapeRow">Shape<select id="msShape"><option value="scatter" selected>Random shape</option><option value="block">Tight block</option></select></div>
-          <div class="sum" id="msSum"></div>
-          <button class="btn stbtn" id="msBtn">Fill cards B–D for me</button>
-          <p class="help" style="margin-top:8px" id="msHelp"></p>
-          <p class="help"><b>Build it yourself:</b> mark any numbers you like on all four tabs — the cards don't have to look like Card A. The breakdown under the cards reads your 4 cards, letters the numbers they cover from each card's drops (A+B, C+D…), marks anchors (on every card) in orange, checks whether it's a standard wheel, and lists exact guarantees for your cards.</p>
-          <p class="help"><b>Or let it fill:</b> mark Card A and press the button to add the cover numbers and fill B–D; then edit them as you like.</p>
-        </div>
+        <h3>Smart Charts strategy</h3>
+        <div class="field">Chart<select id="chSel">
+          <option value="none">None — I'll mark the cards</option>
+          <optgroup label="Standard (spot + 2 base numbers)">
+            <option value="3S">3 Spot · 5 base</option><option value="4S">4 Spot · 6 base</option><option value="5S">5 Spot · 7 base</option>
+            <option value="6S">6 Spot · 8 base</option><option value="7S">7 Spot · 9 base</option><option value="8S">8 Spot · 10 base</option>
+            <option value="9S">9 Spot · 11 base</option><option value="10S">10 Spot · 12 base</option></optgroup>
+          <optgroup label="Condensed (spot + 1 base number)">
+            <option value="3C">3 Spot · 4 base</option><option value="4C">4 Spot · 5 base</option><option value="5C">5 Spot · 6 base</option>
+            <option value="6C">6 Spot · 7 base</option><option value="7C">7 Spot · 8 base</option><option value="8C">8 Spot · 9 base</option>
+            <option value="9C">9 Spot · 10 base</option><option value="10C">10 Spot · 11 base</option></optgroup>
+          <optgroup label="Extended Play">
+            <option value="5/4">5 Spots over 4 Spots · 6 base</option><option value="7/6">7 Spots over 6 Spots · 8 base</option></optgroup>
+        </select></div>
+        <div class="sum" id="chSum"></div>
+        <div class="field">Quick pick zone<select id="qbZone">
+          <option value="rand">Random quadrant</option><option value="tl">Top-Left</option><option value="tr">Top-Right</option>
+          <option value="bl">Bottom-Left</option><option value="br">Bottom-Right</option><option value="ct">Center</option><option value="any">Anywhere</option></select></div>
+        <div class="field">Base shape<select id="qbShape"><option value="scatter">Random shape</option><option value="triplets">Triplets</option><option value="cluster">Tight cluster</option></select></div>
+        <div class="row"><button class="btn stbtn" id="qbBtn" style="flex:1;margin:0">Quick Pick base</button><button class="btn" id="cbBtn">Clear base</button></div>
+        <p class="help" style="margin-top:8px">Click numbers on the <b>Master</b> tab to enter your base numbers #1, #2, … in order (any numbers you like). Cards A–D fill in automatically, skipping the blacked-out boxes, exactly like the chart. Click a base number again to remove it.</p>
         <p class="help" style="margin-top:6px;font-style:italic">Every draw is random. A wheel changes how your wins are spread across cards, not the odds of any number coming up.</p>
       </div>
 
@@ -402,7 +424,8 @@
   for (let n = 1; n <= 80; n++){
     const b = document.createElement('div');
     b.className = 'n m';
-    b.innerHTML = `<span class="mn">${n}</span><span class="ml"></span>`;
+    b.innerHTML = `<span class="mn">${n}</span><span class="ml"></span><span class="mp"></span>`;
+    b.addEventListener('click', () => toggleBase(n));
     masterEl.querySelector(n <= 40 ? '.mg1' : '.mg2').appendChild(b);
     mCells[n] = b;
   }
@@ -422,6 +445,9 @@
       if (cnt >= 2){ ml.className = 'ml star'; ml.textContent = '*'; }
       else { ml.className = 'ml'; ml.innerHTML = on.map((x, i) => x ? `<span style="color:${COLORS[i]}">${NAMES[i]}</span>` : '').join(''); }
       b.title = cnt ? `${n}: ${cnt === 4 ? 'on all 4 cards' : (cnt > 1 ? 'shared by Cards ' : 'Card ') + on.map((x, i) => x ? NAMES[i] : '').filter(Boolean).join(', ')}` : String(n);
+      const bp = S.chartKey !== 'none' ? S.base.indexOf(n) : -1;
+      b.querySelector('.mp').textContent = bp >= 0 ? '#' + (bp + 1) : '';
+      b.classList.toggle('pick', S.chartKey !== 'none');
       b.classList.toggle('cov', cnt > 0); b.classList.toggle('all', cnt >= 2); b.classList.toggle('empty', cnt === 0);
       b.classList.toggle('drawn', drawn.has(n) && !cnt);
       b.classList.toggle('mhit', drawn.has(n) && cnt > 0);
@@ -691,113 +717,147 @@
   };
   const zoneNums = k => { const z = ZONES[k], a = []; for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) a.push(num(z.r0 + r, z.c0 + c)); return a; };
 
-  // ----- Master Wheel: one master array, each card drops specific elements -----
-  const LET = 'ABCDEFGHIJK';
-  const MASTER = {
-    3:{label:'3-Spot · "4-Number Master"',  n:4,  spots:3, drops:[[0],[1],[2],[3]],
-       shape:[[0,0],[0,1],[1,0],[1,1]], example:[6,7,16,17]},
-    5:{label:'5-Spot · "6-Number Master"',  n:6,  spots:5, drops:[[0],[1],[2],[3]],
-       shape:[[0,0],[0,1],[1,0],[1,1],[2,0],[2,1]], example:[6,7,16,17,26,27]},
-    7:{label:'7-Spot · "9-Number Master"',  n:9,  spots:7, drops:[[0,1],[2,3],[4,5],[6,7]],
-       shape:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]], example:[6,7,8,16,17,18,26,27,28]},
-    9:{label:'9-Spot · "11-Number Master"', n:11, spots:9, drops:[[0,1],[2,3],[4,5],[6,7]],
-       shape:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,0],[3,1]], example:[6,7,8,16,17,18,26,27,28,36,37]}
+  // ----- Mystic Keno Smart Charts™ (Four Card Keno Edition, TheMysticGambler.com 2015–2018) -----
+  // Each chart lists, for cards A–D, the base positions (1-based) that are blacked out (left off that card).
+  const CHARTS = {
+    '3S': {spot:3,  type:'Standard',  base:5,  combos:10, drops:[[2,3],[4,5],[1,4],[3,5]]},
+    '4S': {spot:4,  type:'Standard',  base:6,  combos:15, drops:[[2,3],[5,6],[1,4],[3,5]]},
+    '5S': {spot:5,  type:'Standard',  base:7,  combos:21, drops:[[2,3],[6,7],[1,4],[3,5]]},
+    '6S': {spot:6,  type:'Standard',  base:8,  combos:28, drops:[[2,3],[6,7],[1,4],[5,8]]},
+    '7S': {spot:7,  type:'Standard',  base:9,  combos:36, drops:[[1,2],[5,6],[8,9],[3,7]]},
+    '8S': {spot:8,  type:'Standard',  base:10, combos:45, drops:[[1,2],[5,6],[8,9],[3,7]]},
+    '9S': {spot:9,  type:'Standard',  base:11, combos:55, drops:[[2,11],[5,6],[8,9],[3,10]]},
+    '10S':{spot:10, type:'Standard',  base:12, combos:66, drops:[[4,11],[5,12],[8,9],[1,10]]},
+    '3C': {spot:3,  type:'Condensed', base:4,  combos:4,  drops:[[2],[3],[1],[4]]},
+    '4C': {spot:4,  type:'Condensed', base:5,  combos:5,  drops:[[2],[3],[1],[5]]},
+    '5C': {spot:5,  type:'Condensed', base:6,  combos:6,  drops:[[2],[6],[1],[5]]},
+    '6C': {spot:6,  type:'Condensed', base:7,  combos:7,  drops:[[2],[6],[1],[5]]},
+    '7C': {spot:7,  type:'Condensed', base:8,  combos:8,  drops:[[2],[6],[1],[7]]},
+    '8C': {spot:8,  type:'Condensed', base:9,  combos:9,  drops:[[1],[5],[7],[9]]},
+    '9C': {spot:9,  type:'Condensed', base:10, combos:10, drops:[[3],[1],[7],[9]]},
+    '10C':{spot:10, type:'Condensed', base:11, combos:11, drops:[[3],[1],[7],[11]]},
+    '5/4':{spot:5,  type:'Extended',  base:6,  drops:[[5],[2],[1,3],[4,6]], title:'5 Spots over 4 Spots'},
+    '7/6':{spot:7,  type:'Extended',  base:8,  drops:[[6],[2],[1,3],[5,7]], title:'7 Spots over 6 Spots'}
   };
-  const masterAnchors = v => { const d = new Set(MASTER[v].drops.flat()); return [...Array(MASTER[v].n).keys()].filter(i => !d.has(i)); };
-  const masterCard = (v, master, ci) => master.filter((_, i) => !MASTER[v].drops[ci].includes(i));
-  const dropText = (v, ci) => MASTER[v].drops[ci].map(i => LET[i]).join('+');
-
-  function placeBlock(shape, zk){
-    const h = Math.max(...shape.map(c => c[0])) + 1, w = Math.max(...shape.map(c => c[1])) + 1;
-    let r0 = 0, r1 = 7, c0 = 0, c1 = 9;
-    if (zk !== 'any'){ const z = ZONES[zk]; r0 = z.r0; r1 = z.r0 + 3; c0 = z.c0; c1 = z.c0 + 4; }
-    const r = rint(r0, r1 - h + 1), c = rint(c0, c1 - w + 1);
-    return shape.map(([dr, dc]) => num(r + dr, c + dc));
-  }
-
-  const MS_TEXT = {
-    3: 'Every card plays 3 of your 4 master numbers. If 3 of the 4 hit, one card catches 3/3 and the other three catch 2/3. All 4 hit and every card catches 3/3.',
-    5: 'E and F are on every card. If both anchors and 3 of A–D hit, one card catches 5/5 and the other three catch 4/5, so all four cards pay.',
-    7: 'Every master number is on at least 3 cards. If 7 of 9 hit, a 7/7 card needs your 2 misses to be one card\'s dropped pair (A+B, C+D, E+F or G+H). Otherwise the best card is 6/7. If 8 of 9 hit, a 7/7 is guaranteed unless the miss is anchor I.',
-    9: 'I, J and K are on every card. If 9 of 11 hit, a 9/9 card needs your 2 misses to be one card\'s dropped pair. Otherwise the best card is 8/9. If 10 of 11 hit, a 9/9 is guaranteed unless the miss is an anchor (I, J or K).'
+  const chartTitle = k => { const c = CHARTS[k]; return c.title || `${c.type === 'Condensed' ? 'Condensed ' : ''}Mystic ${c.spot} Spot Smart Chart`; };
+  const chartDesc = k => {
+    const c = CHARTS[k];
+    if (c.type === 'Extended') { const sz = c.drops.map(d => c.base - d.length); return `Cards A & B play ${sz[0]} spots, C & D play ${sz[2]} spots, all from ${c.base} base numbers. The smaller spot wins more often to keep you in the game for the bigger one.`; }
+    return `Reduces ${c.base} base numbers to four ${c.spot} spots · total possible combinations: ${c.combos}` + (c.type === 'Condensed' ? ' · more volatile: bigger jackpots, fewer wins' : '');
   };
+  const chartCards = (k, base) => CHARTS[k].drops.map(d => base.filter((n, i) => n != null && !d.includes(i + 1)));
 
-  // The player picks M.spots numbers; the wheel adds (M.n - M.spots) more so the 4 cards cover M.n.
-  // Added numbers take the first master positions (A, or A+B), so Card A — which drops exactly those — is the player's own picks.
-  const extraCount = v => MASTER[v].n - MASTER[v].spots;
-  function addExtras(picks, k, mode){
-    const have = new Set(picks), out = [];
-    if (mode === 'near'){
-      const near = new Set();
-      picks.forEach(n => {
-        const r = Math.floor((n - 1) / 10), c = (n - 1) % 10;
-        for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++){
-          const rr = r + dr, cc = c + dc;
-          if (rr >= 0 && rr < 8 && cc >= 0 && cc < 10 && !have.has(num(rr, cc))) near.add(num(rr, cc));
-        }
-      });
-      shuffle([...near]).slice(0, k).forEach(n => { out.push(n); have.add(n); });
-    }
-    if (mode === 'touch'){
-      const score = new Map();
-      picks.forEach(n => {
-        const r = Math.floor((n - 1) / 10), c = (n - 1) % 10;
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++){
-          const rr = r + dr, cc = c + dc;
-          if ((dr || dc) && rr >= 0 && rr < 8 && cc >= 0 && cc < 10){
-            const m = num(rr, cc);
-            if (!have.has(m)) score.set(m, (score.get(m) || 0) + (dr && dc ? 1 : 2));
-          }
-        }
-      });
-      const ranked = shuffle([...score.keys()]).sort((a, b) => score.get(b) - score.get(a));
-      ranked.slice(0, k).forEach(n => { out.push(n); have.add(n); });
-    }
-    for (const n of randomSet(80)){ if (out.length >= k) break; if (!have.has(n)){ out.push(n); have.add(n); } }
-    return out.sort((a, b) => a - b);
-  }
+  // Base numbers are entered in order (#1, #2, …); a removed number leaves its slot open for the next click.
+  S.chartKey = store.get('chart', '7S'); if (!(S.chartKey in CHARTS) && S.chartKey !== 'none') S.chartKey = '7S';
+  S.base = [];
+  function fitBase(){ const N = S.chartKey === 'none' ? 0 : CHARTS[S.chartKey].base; S.base = S.base.slice(0, N); while (S.base.length < N) S.base.push(null); }
+  fitBase();
 
-  function updateMsSum(){
-    const v = +$('msVar').value, M = MASTER[v], an = masterAnchors(v), k = extraCount(v);
-    const z = $('msZone').value, have = S.cards[0].picks.size;
-    $('msExtraRow').style.display = z === 'mine' ? '' : 'none';
-    $('msShapeRow').style.display = z === 'mine' || z === 'example' ? 'none' : '';
-    let ok = true;
-    if (z === 'mine' && have !== M.spots){ ok = false; $('msSum').textContent = `Mark exactly ${M.spots} numbers on Card A (it has ${have}). The wheel adds ${k} more to cover ${M.n}.`; }
-    else $('msSum').textContent = `Pick ${M.spots} → cover ${M.n} with 4 cards (${k} added) · drops ${M.drops.map(d => d.map(i => LET[i]).join('+')).join(' / ')}` + (an.length ? ` · anchor${an.length > 1 ? 's' : ''} ${an.map(i => LET[i]).join(', ')}` : '');
-    $('msSum').style.color = ok ? '' : 'var(--red)';
-    $('msBtn').disabled = !ok || S.playing || S.autoLeft > 0;
-    $('msHelp').textContent = MS_TEXT[v];
-    const ex = $('msZone').querySelector('[value="example"]');
-    ex.textContent = `Example ${fmt(M.example)}`;
-  }
-
-  function buildMaster(){
-    if (S.playing || S.autoLeft) return;
-    const v = +$('msVar').value, M = MASTER[v];
-    let z = $('msZone').value, master;
-    if (z === 'example') master = [...M.example];
-    else if (z === 'mine'){
-      if (S.cards[0].picks.size !== M.spots) return;
-      // Shuffle the player's numbers so each rebuild drops different ones on B–D
-      const mine = shuffle([...S.cards[0].picks]);
-      master = [...addExtras(mine, extraCount(v), $('msExtra').value), ...mine];
-    }
-    else {
-      if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)];
-      master = $('msShape').value === 'block' ? placeBlock(M.shape, z)
-             : shuffle(z === 'any' ? randomSet(80) : zoneNums(z)).slice(0, M.n);   // random shape inside the zone
-    }
-    S.cards.forEach((c, ci) => { c.picks = new Set(masterCard(v, master, ci)); c.active = true; });
-    const k = extraCount(v);
-    const srt = a => [...a].sort((x, y) => x - y);
-    finishStrategy(`Card A ${fmt(srt(master.slice(k)))} + added ${fmt(srt(master.slice(0, k)))} → B–D filled to cover ${M.n}. Change any card freely — the breakdown re-checks your wheel.`);
-  }
-
-  function finishStrategy(text){
+  function applyChart(msg){
+    if (S.chartKey === 'none') return;
+    chartCards(S.chartKey, S.base).forEach((set, ci) => { S.cards[ci].picks = new Set(set); S.cards[ci].active = true; });
     S.sync = false; $('sync').checked = false;
-    clearResults(); beep(700, 0.1, 'triangle'); say(text); render();
+    clearResults();
+    if (msg) say(msg);
+    render();
   }
+  function toggleBase(n){
+    if (S.playing || S.autoLeft) return;
+    if (S.chartKey === 'none'){ say('Choose a Smart Chart to enter base numbers on the Master board, or mark the card tabs yourself.', true); return; }
+    const i = S.base.indexOf(n), N = S.base.length;
+    if (i >= 0) S.base[i] = null;
+    else {
+      const slot = S.base.indexOf(null);
+      if (slot < 0){ say(`All ${N} base numbers are entered — click one to remove it first.`, true); return; }
+      S.base[slot] = n;
+    }
+    beep(i >= 0 ? 330 : 520, 0.05, 'triangle', 0.04);
+    const have = S.base.filter(x => x != null).length;
+    applyChart(have === N ? `Base complete — Cards A–D filled from the ${chartTitle(S.chartKey)}.` : `Base ${have} / ${N} entered. Click the Master board to add #${S.base.indexOf(null) + 1}.`);
+  }
+
+  // Quick-pick a base: random scatter, triplets (the booklet's "triplet pattern play"), or a tight irregular cluster
+  function neighbors(n, allowed){
+    const r = Math.floor((n - 1) / 10), c = (n - 1) % 10, out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++){
+      const rr = r + dr, cc = c + dc;
+      if ((dr || dc) && rr >= 0 && rr < 8 && cc >= 0 && cc < 10 && allowed.has(num(rr, cc))) out.push(num(rr, cc));
+    }
+    return out;
+  }
+  function quickBase(N, zk, shape){
+    if (zk === 'rand') zk = ['tl','tr','bl','br'][rint(0, 3)];
+    const pool = zk === 'any' ? Array.from({length:80}, (_, i) => i + 1) : zoneNums(zk);
+    const allowed = new Set(pool), out = [];
+    if (shape === 'triplets'){
+      for (let t = 0; out.length < N && t < 200; t++){
+        const free = pool.filter(n => !out.includes(n));
+        const start = free[rint(0, free.length - 1)], grp = [start];
+        while (grp.length < 3 && out.length + grp.length < N){
+          const nb = shuffle(grp.flatMap(g => neighbors(g, allowed))).find(x => !out.includes(x) && !grp.includes(x));
+          if (!nb) break; grp.push(nb);
+        }
+        if (grp.length === Math.min(3, N - out.length)) out.push(...grp);
+      }
+    } else if (shape === 'cluster'){
+      out.push(pool[rint(0, pool.length - 1)]);
+      while (out.length < N){
+        const nb = shuffle(out.flatMap(g => neighbors(g, allowed))).find(x => !out.includes(x));
+        if (!nb) break; out.push(nb);
+      }
+    }
+    for (const n of shuffle([...pool])){ if (out.length >= N) break; if (!out.includes(n)) out.push(n); }
+    return shape === 'scatter' ? shuffle(out) : out;
+  }
+
+  function renderChart(){
+    const panel = $('chartPanel'), k = S.chartKey;
+    $('chSum').textContent = k === 'none' ? 'Mark each card tab yourself; the breakdown still checks your cards.' : chartDesc(k);
+    ['qbZone','qbShape','qbBtn','cbBtn'].forEach(id => $(id).disabled = k === 'none' || S.playing || S.autoLeft > 0);
+    if (k === 'none'){ panel.hidden = true; return; }
+    panel.hidden = false;
+    const c = CHARTS[k], N = c.base, have = S.base.filter(x => x != null).length;
+    $('chTitle').textContent = chartTitle(k);
+    $('chDesc').textContent = `${chartDesc(k)}  ·  Base ${have} / ${N} entered`;
+    const drawn = new Set(S.draw.slice(0, S.shown));
+    const cell = (n, black) => black ? '<td class="blk"></td>'
+      : `<td class="${n != null && drawn.has(n) ? 'hitc' : ''}">${n != null ? n : ''}</td>`;
+    let h = '<tr><th></th>' + Array.from({length:N}, (_, i) => `<th>${i + 1}</th>`).join('') + '</tr>';
+    h += '<tr class="baserow"><th style="color:var(--red)">Base</th>' + S.base.map((n, i) =>
+      `<td data-pos="${i}" class="${n == null ? 'open' : drawn.has(n) ? 'hitc' : ''}" title="${n == null ? 'Click the Master board to fill #' + (i + 1) : 'Click to remove'}">${n != null ? n : ''}</td>`).join('') + '</tr>';
+    c.drops.forEach((d, ci) => {
+      h += `<tr><th style="color:${COLORS[ci]}">${NAMES[ci]}</th>` + S.base.map((n, i) => cell(n, d.includes(i + 1))).join('') +
+           `<td class="sz">${N - d.length}</td></tr>`;
+    });
+    $('chTable').innerHTML = h;
+  }
+
+  $('chSel').addEventListener('change', e => {
+    if (S.playing || S.autoLeft) return;
+    S.chartKey = e.target.value; store.set('chart', S.chartKey);
+    const keep = S.base.filter(x => x != null);
+    fitBase();
+    if (S.chartKey !== 'none'){
+      keep.slice(0, S.base.length).forEach((n, i) => S.base[i] = n);
+      S.master = true;
+      applyChart(`${chartTitle(S.chartKey)}: ${S.base.filter(x => x != null).length} / ${S.base.length} base numbers. Click the Master board to enter them.`);
+    } else { say('No chart — mark each card yourself.'); render(); }
+  });
+  $('qbBtn').addEventListener('click', () => {
+    if (S.playing || S.autoLeft || S.chartKey === 'none') return;
+    S.base = quickBase(CHARTS[S.chartKey].base, $('qbZone').value, $('qbShape').value);
+    S.master = true;
+    applyChart(`Quick-picked base ${fmt(S.base)} → Cards A–D filled from the ${chartTitle(S.chartKey)}.`);
+  });
+  $('cbBtn').addEventListener('click', () => {
+    if (S.playing || S.autoLeft || S.chartKey === 'none') return;
+    S.base = S.base.map(() => null); S.master = true;
+    applyChart('Base cleared. Click the Master board to enter base #1.');
+  });
+  $('chTable').addEventListener('click', e => {
+    const td = e.target.closest('td[data-pos]'); if (!td) return;
+    const n = S.base[+td.dataset.pos]; if (n != null) toggleBase(n);
+  });
 
   // ----- Read the wheel straight from the four cards the player marked -----
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -811,23 +871,24 @@
     const anchors = union.filter(n => sets.every(s => s.includes(n)));
     // Letter the master the same way the drop rules do: Card A's dropped numbers first (A, B…),
     // then Card B's, C's, D's, and the anchors (on every card) last.
-    const master = [];
-    drops.forEach(d => d.forEach(n => { if (!master.includes(n)) master.push(n); }));
-    anchors.forEach(n => master.push(n));
-    const L = new Map(master.map((n, i) => [n, letter(i)]));
-    const sizes = new Set(sets.map(s => s.length)), k = sets[0].length, M = MASTER[k];
-    const issues = [];
-    if (sizes.size > 1) issues.push('the cards have different spot counts');
-    else if (!M) issues.push('standard wheels are 3, 5, 7 or 9 spots');
-    else {
-      if (union.length !== M.n) issues.push(`covers ${union.length} numbers (a ${k}-spot wheel covers ${M.n})`);
-      const dsz = M.drops[0].length;
-      if (drops.some(d => d.length !== dsz)) issues.push(`each card should leave out exactly ${dsz} of the ${M.n}`);
-      const all = drops.flat();
-      if (new Set(all).size !== all.length) issues.push('two cards leave out the same number');
+    // If the cards are exactly what the selected Smart Chart makes from the base, label by base position (#1…#N)
+    let chart = null;
+    if (S.chartKey !== 'none' && S.base.every(x => x != null)){
+      const want = chartCards(S.chartKey, S.base).map(a => [...a].sort((x, y) => x - y).join(','));
+      if (want.every((w, i) => w === sets[i].join(','))) chart = S.chartKey;
     }
-    return {sets, union, master, anchors, drops, L, k: sizes.size === 1 ? k : null,
-            valid: !issues.length, issues, isWheel: union.length > Math.max(...sets.map(s => s.length))};
+    let master, L;
+    if (chart){ master = [...S.base]; L = new Map(master.map((n, i) => [n, '#' + (i + 1)])); }
+    else {
+      master = [];
+      drops.forEach(d => d.forEach(n => { if (!master.includes(n)) master.push(n); }));
+      anchors.forEach(n => master.push(n));
+      L = new Map(master.map((n, i) => [n, letter(i)]));
+    }
+    const sizes = new Set(sets.map(s => s.length)), k = sets[0].length;
+    const issues = chart ? [] : [S.chartKey === 'none' ? 'your own cards (no chart selected)' : 'these cards no longer match the ' + chartTitle(S.chartKey)];
+    return {sets, union, master, anchors, drops, L, k: sizes.size === 1 ? k : null, chart,
+            valid: !!chart, issues, isWheel: union.length > Math.max(...sets.map(s => s.length))};
   }
 
   // Exact outcomes for every way h of the covered numbers can hit, for the cards as marked
@@ -871,12 +932,13 @@
   // ----- JSON export -----
   function strategyJSON(){
     const w = S.strategy; if (!w) return null;
-    const letters = {}; w.master.forEach(n => letters[w.L.get(n)] = n);
+    const C = w.chart ? CHARTS[w.chart] : null;
     return {
-      strategyName: `${w.k ? w.k + '-Spot ' : ''}Wheel covering ${w.union.length}`,
-      standardWheel: w.valid, totalCards: 4, spotsPerCard: w.k || w.sets.map(s => s.length),
-      masterArray: w.master, letters, anchors: w.anchors,
-      cards: w.sets.map((s, ci) => ({cardId: ci + 1, dropped: w.drops[ci], droppedElements: w.drops[ci].map(n => w.L.get(n)), finalSelection: s}))
+      strategyName: C ? chartTitle(w.chart) : `Custom cards covering ${w.union.length}`,
+      chartType: C ? C.type : 'Custom', totalCards: 4, spotsPerCard: w.k || w.sets.map(s => s.length),
+      baseNumbers: C ? S.base : w.master, anchors: w.anchors,
+      cards: w.sets.map((s, ci) => Object.assign({cardId: ci + 1},
+        C ? {blackedOutPositions: C.drops[ci]} : {}, {dropped: w.drops[ci], finalSelection: s}))
     };
   }
 
@@ -889,12 +951,12 @@
     const pays = c => S.done ? (c.win ? `<b class="g">${money(c.win)}</b>` : '$0.00') : '—';
     const an = new Set(w.anchors), n = w.union.length;
     const mHit = w.union.filter(x => drawn.has(x)).length;
-    let head = `<b>Your wheel</b> — 4 cards${w.k ? ` × ${w.k} spots` : ''} cover <b>${n}</b> numbers: ` +
+    let head = `<b>${w.chart ? chartTitle(w.chart) : 'Your cards'}</b> — 4 cards${w.k ? ` × ${w.k} spots` : ''} cover <b>${n}</b> numbers: ` +
       '<span class="chips">' + w.master.map(x => `<i class="${drawn.has(x) ? 'on' : ''}${an.has(x) ? ' anc' : ''}"><sup>${w.L.get(x)}</sup>${x}</i>`).join('') + '</span>';
     head += w.valid
-      ? `<div class="hl2" style="color:var(--green)">✓ Standard ${w.k}-spot wheel covering ${n} · drops ${w.drops.map(d => d.map(x => w.L.get(x)).join('+')).join(' / ')}` +
-        (w.anchors.length ? ` · anchor${w.anchors.length > 1 ? 's' : ''} ${w.anchors.map(x => w.L.get(x)).join(', ')}` : '') + '</div>'
-      : `<div class="hl2" style="color:var(--gold2)">Custom wheel — ${w.issues.join('; ')}. Guarantees below are still exact for these cards.</div>`;
+      ? `<div class="hl2" style="color:var(--green)">✓ Matches the ${chartTitle(w.chart)} · blacked out: ${w.drops.map((d, i) => NAMES[i] + ' ' + (d.map(x => w.L.get(x)).sort((p, q) => p.slice(1) - q.slice(1)).join('+') || '—')).join(' / ')}` +
+        (w.anchors.length ? ` · on every card: ${w.anchors.map(x => w.L.get(x)).join(', ')}` : '') + '</div>'
+      : `<div class="hl2" style="color:var(--gold2)">${w.issues.join('; ')}. Guarantees below are still exact for these cards.</div>`;
     if (live) head += `<div class="hl2">Covered numbers caught: <b>${mHit} / ${n}</b>.</div>`;
     const rows = `<tr><th>Card</th><th>Leaves out</th><th>Plays</th><th>Hits</th><th>Pays</th></tr>` +
       S.cards.map((c, ci) => {
@@ -928,8 +990,6 @@
     }));
   }
 
-  ['msVar','msZone','msExtra','msShape'].forEach(id => $(id).addEventListener('change', updateMsSum));
-  $('msBtn').addEventListener('click', buildMaster);
   $('jsonBox').addEventListener('toggle', renderReport);
   $('jsonCopy').addEventListener('click', async () => {
     const txt = JSON.stringify(strategyJSON(), null, 2);
@@ -941,12 +1001,12 @@
   const _render = render;
   render = function(){
     S.strategy = analyzeWheel();
-    _render(); markBoard(); updateMsSum(); renderReport();
+    _render(); markBoard(); renderChart(); renderReport();
     const busy = S.playing || S.autoLeft > 0;
-    ['msVar','msZone','msExtra','msShape'].forEach(id => $(id).disabled = busy);
+    $('chSel').disabled = busy; $('chSel').value = S.chartKey;
   };
   const _renderInfo = renderInfo;
-  renderInfo = function(){ _renderInfo(); if (S.strategy) renderReport(); };
+  renderInfo = function(){ _renderInfo(); if (S.strategy) renderReport(); if (S.chartKey !== 'none') renderChart(); };
 
 
   // ---------- Wire up ----------
