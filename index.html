@@ -315,7 +315,7 @@
     stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0}),
     denom: store.get('denom', 25), mult: store.get('mult', 1),
     speed: store.get('speed', 'Normal'),
-    sync: false, master: false, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
+    sync: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
     draw: [], shown: 0, done: false,
     cards: [0,1,2,3].map(i => ({picks:new Set(), active:true, bet: 0, hits:0, win:0}))
   };
@@ -383,7 +383,7 @@
   masterEl.className = 'card master';
   masterEl.innerHTML = `
     <div class="chead"><span class="name">Master</span><span class="info"></span>
-      <span class="legend"><span><b style="color:var(--gold)">*</b> on all 4 cards</span>${NAMES.map((L, i) => `<b style="color:${COLORS[i]}">${L}</b>`).join(' ')}<span>= card</span></span></div>
+      <span class="legend"><span><b style="color:var(--gold)">*</b> shared by 2+ cards</span>${NAMES.map((L, i) => `<b style="color:${COLORS[i]}">${L}</b>`).join(' ')}<span>= card</span></span></div>
     <div class="grid mg1"></div><div class="grid split mg2"></div>`;
   for (let n = 1; n <= 80; n++){
     const b = document.createElement('div');
@@ -392,12 +392,12 @@
     masterEl.querySelector(n <= 40 ? '.mg1' : '.mg2').appendChild(b);
     mCells[n] = b;
   }
-  $('cards').appendChild(masterEl);
+  $('cards').prepend(masterEl);
   const mTab = document.createElement('button');
   mTab.className = 'ctab mtab'; mTab.setAttribute('role', 'tab'); mTab.style.setProperty('--c', '#b9b3ff');
   mTab.innerHTML = `<span class="tn">Master</span><span class="ts"></span><span class="tw"></span>`;
   mTab.addEventListener('click', () => { S.master = true; render(); });
-  $('ctabs').appendChild(mTab);
+  $('ctabs').prepend(mTab);
 
   function renderMaster(){
     const drawn = new Set(S.draw.slice(0, S.shown));
@@ -405,15 +405,15 @@
     for (let n = 1; n <= 80; n++){
       const on = S.cards.map(c => c.picks.has(n));
       const cnt = on.filter(Boolean).length, b = mCells[n], ml = b.querySelector('.ml');
-      if (cnt === 4){ ml.className = 'ml star'; ml.textContent = '*'; }
+      if (cnt >= 2){ ml.className = 'ml star'; ml.textContent = '*'; }
       else { ml.className = 'ml'; ml.innerHTML = on.map((x, i) => x ? `<span style="color:${COLORS[i]}">${NAMES[i]}</span>` : '').join(''); }
-      b.title = cnt ? `${n}: ${cnt === 4 ? 'on all 4 cards' : 'Card ' + on.map((x, i) => x ? NAMES[i] : '').filter(Boolean).join(', ')}` : String(n);
-      b.classList.toggle('cov', cnt > 0); b.classList.toggle('all', cnt === 4); b.classList.toggle('empty', cnt === 0);
+      b.title = cnt ? `${n}: ${cnt === 4 ? 'on all 4 cards' : (cnt > 1 ? 'shared by Cards ' : 'Card ') + on.map((x, i) => x ? NAMES[i] : '').filter(Boolean).join(', ')}` : String(n);
+      b.classList.toggle('cov', cnt > 0); b.classList.toggle('all', cnt >= 2); b.classList.toggle('empty', cnt === 0);
       b.classList.toggle('drawn', drawn.has(n) && !cnt);
       b.classList.toggle('mhit', drawn.has(n) && cnt > 0);
-      if (cnt) covered++; if (cnt === 4) onAll++; if (cnt && drawn.has(n)) hit++;
+      if (cnt) covered++; if (cnt >= 2) onAll++; if (cnt && drawn.has(n)) hit++;
     }
-    const info = covered ? `<b>${covered}</b> covered · <b>${onAll}</b> on all` + (S.shown ? ` · Hit <b>${hit}</b>` : '') : 'no spots yet';
+    const info = covered ? `<b>${covered}</b> covered · <b>${onAll}</b> shared` + (S.shown ? ` · Hit <b>${hit}</b>` : '') : 'no spots yet';
     masterEl.querySelector('.info').innerHTML = info;
     mTab.querySelector('.ts').innerHTML = covered ? (S.shown ? `Hit <b>${hit}</b> of ${covered}` : `<b>${covered}</b> covered`) : 'combined';
     const total = S.cards.reduce((t, c) => t + c.win, 0);
