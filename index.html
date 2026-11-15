@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4-Card Keno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0a1f; --bg2:#15123a; --panel:#1c1848; --line:#2f2a6b;
+    --text:#ecebff; --muted:#9b97d6; --gold:#ffcc33; --gold2:#ff9f1c;
+    --pick:#3d7bff; --drawn:#4a4570; --hit:#ffcc33; --red:#ff4d6d; --green:#2ee59d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:radial-gradient(ellipse at top,#241d63 0%,var(--bg) 60%) fixed;color:var(--text);font-family:Rubik,system-ui,sans-serif;min-height:100vh}
+  button{font-family:inherit;cursor:pointer}
+  button:disabled{cursor:not-allowed;opacity:.45}
+  .wrap{max-width:1240px;margin:0 auto;padding:16px}
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;justify-content:space-between;margin-bottom:14px}
+  h1{font-family:Bungee,sans-serif;font-weight:400;margin:0;font-size:clamp(26px,4vw,40px);letter-spacing:1px;
+     background:linear-gradient(180deg,#fff2b0,var(--gold) 45%,var(--gold2));-webkit-background-clip:text;background-clip:text;color:transparent;
+     filter:drop-shadow(0 2px 0 #7a3b00)}
+  .meters{display:flex;gap:10px;flex-wrap:wrap}
+  .meter{background:#000a;border:2px solid var(--line);border-radius:10px;padding:6px 14px;min-width:110px;text-align:center}
+  .meter small{display:block;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
+  .meter b{font-family:Bungee,sans-serif;font-weight:400;font-size:22px;color:var(--gold)}
+  .meter.win b{color:var(--green)}
+  .meter.win.pop{animation:pop .6s ease}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.18);box-shadow:0 0 30px var(--green)}100%{transform:scale(1)}}
+
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
+  @media (max-width:980px){.layout{grid-template-columns:1fr}}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){.cards{grid-template-columns:1fr}}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:10px;position:relative;transition:border-color .2s,opacity .2s}
+  .card.focus{border-color:#6b62e0}
+  .card.off{opacity:.42}
+  .card.won{border-color:var(--green);box-shadow:0 0 18px #2ee59d55}
+  .chead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+  .chead .name{font-family:Bungee,sans-serif;font-size:15px;color:var(--gold)}
+  .chead .info{color:var(--muted);flex:1}
+  .chead .info b{color:var(--text)}
+  .toggle{border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800;letter-spacing:1px;background:#0006;color:var(--muted);border:1px solid var(--line)}
+  .toggle.on{background:var(--green);color:#03281a;border-color:var(--green)}
+  .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+  .grid.split{margin-top:3px;padding-top:3px;border-top:1px dashed var(--line)}
+  .n{aspect-ratio:1;border:none;border-radius:6px;background:#0d0b2a;color:#cfcdf5;font-weight:700;font-size:clamp(10px,1.15vw,14px);padding:0;
+     display:flex;align-items:center;justify-content:center;transition:background .12s,transform .12s;position:relative}
+  .n:hover{background:#26215c}
+  .n.zone{background:#272062;box-shadow:inset 0 0 0 1px #4b42a8}
+  .n.picked{background:var(--pick);color:#fff;box-shadow:inset 0 -2px 0 #0004}
+  .n.drawn{background:var(--drawn);color:#fff}
+  .n.drawn::after{content:"";position:absolute;inset:18%;border-radius:50%;border:2px solid #ffffff55}
+  .n.picked.drawn{background:#3d7bff;}
+  .n.hit{background:radial-gradient(circle at 35% 30%,#fff6c8,var(--hit) 45%,var(--gold2));color:#3a1d00;animation:hit .35s ease;box-shadow:0 0 10px #ffcc3399}
+  .n.hit::after{border-color:#7a3b0066}
+  @keyframes hit{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+  .badge{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;
+     font-family:Bungee,sans-serif;font-size:clamp(20px,3vw,30px);color:var(--green);background:#000c;border:2px solid var(--green);border-radius:12px;padding:6px 16px;
+     transition:all .3s cubic-bezier(.3,1.6,.5,1);white-space:nowrap}
+  .card.won .badge{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .card.won:hover .badge{opacity:.15}
+
+  .main{display:flex;flex-direction:column;gap:12px}
+  .strip{background:#000a;border:2px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:58px}
+  .strip .lbl{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-right:6px;font-weight:700}
+  .ball{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#3a1d00;
+     background:radial-gradient(circle at 35% 30%,#fff,#ffe58a 40%,var(--gold2));box-shadow:0 2px 6px #0008;animation:drop .3s cubic-bezier(.3,1.6,.5,1)}
+  .ball.ph{background:#ffffff0d;box-shadow:none;animation:none}
+  @keyframes drop{0%{transform:translateY(-14px) scale(.5);opacity:0}100%{transform:none;opacity:1}}
+  .cbet{display:flex;align-items:center;gap:2px;background:#0006;border:1px solid var(--line);border-radius:20px;padding:1px}
+  .cbet button{width:22px;height:22px;border-radius:50%;border:none;background:#2a2470;color:var(--text);font-weight:800;line-height:1;padding:0}
+  .cbet b{min-width:26px;text-align:center;font-size:12px;color:var(--gold)}
+  .cbet span{font-size:10px;color:var(--muted);padding-left:6px}
+  .tabs{display:flex;gap:4px;margin-bottom:10px;background:#0006;border-radius:10px;padding:3px}
+  .tabs button{flex:1;border:none;border-radius:8px;padding:7px 4px;font-weight:700;font-size:13px;background:none;color:var(--muted)}
+  .tabs button.sel{background:var(--gold);color:#3a1d00}
+  .field{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+  .field select{flex:0 0 60%}
+  .stbtn{width:100%;margin-top:4px;background:linear-gradient(180deg,#6f8dff,#3d5bff);border:none;color:#fff}
+  .stbtn:hover:not(:disabled){background:linear-gradient(180deg,#8aa3ff,#5270ff)}
+  .sum{font-size:12px;color:var(--gold);margin:-2px 0 8px}
+  .n.core{outline:2px solid #ff9f1c;outline-offset:-2px}
+  .exbtn{width:100%;margin-top:6px;font-size:12px;padding:7px;background:none;border:1px dashed #4b42a8;color:var(--muted)}
+  .exbtn:hover:not(:disabled){background:#ffffff0a;color:var(--text)}
+  .report{font-size:13px}
+  .report .hl2{margin-top:6px;color:var(--text)}
+  .report .hl2 b{color:var(--gold)}
+  .report .dim{color:var(--muted)}
+  .report .g{color:var(--green)}
+  .tscroll{overflow-x:auto;margin-top:8px}
+  #repTable td,#repTable th{text-align:left;white-space:nowrap;padding:5px 8px;border-top:1px solid var(--line)}
+  #repTable td:last-child,#repTable th:last-child{text-align:right}
+  .chips{display:inline-flex;gap:3px;flex-wrap:wrap}
+  .chips i{font-style:normal;font-size:12px;font-weight:700;min-width:24px;text-align:center;padding:2px 4px;border-radius:5px;background:#0d0b2a;color:#cfcdf5}
+  .chips i.on{background:var(--gold);color:#3a1d00}
+  .chips i.anc{box-shadow:inset 0 0 0 2px #ff9f1c}
+  .chips sup{font-size:9px;color:var(--muted);margin-right:2px}
+  .chips i.on sup{color:#7a3b00}
+  .gt td,.gt th{text-align:left;white-space:nowrap;padding:5px 8px;border-top:1px solid var(--line)}
+  .gt td:last-child,.gt th:last-child{text-align:right}
+  .gt tr.cur td{background:#2ee59d33;color:var(--green)}
+  details{margin-top:10px}
+  summary{cursor:pointer;color:var(--muted);font-size:12px}
+  pre{background:#000a;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px;max-height:280px;overflow:auto;color:#cfe;user-select:text}
+  .betup{background:linear-gradient(180deg,#ffd65c,var(--gold2));color:#3a1d00;border:none;font-weight:800}
+  .betup:hover:not(:disabled){background:linear-gradient(180deg,#ffe28a,#ffb347)}
+  .pips{display:flex;gap:4px;flex:1}
+  .pips i{flex:1;text-align:center;font-style:normal;font-weight:800;font-size:13px;padding:7px 0;border-radius:8px;background:#0006;color:var(--muted);border:1px solid var(--line)}
+  .pips i.on{background:var(--gold);color:#3a1d00;border-color:var(--gold)}
+  .cardbet{font-size:11px;color:var(--gold);font-weight:700;background:#0006;border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+  aside{display:flex;flex-direction:column;gap:12px}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
+  .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{border:none;border-radius:10px;padding:9px 12px;font-weight:700;font-size:14px;background:#2a2470;color:var(--text);border:1px solid #3d3690}
+  .btn:hover:not(:disabled){background:#352e88}
+  .btn.sel{background:var(--gold);color:#3a1d00;border-color:var(--gold)}
+  .play{width:100%;padding:14px;font-family:Bungee,sans-serif;font-size:22px;border-radius:12px;border:none;
+     background:linear-gradient(180deg,#5dffbe,var(--green) 50%,#14a86e);color:#03281a;box-shadow:0 4px 0 #0a6d47,0 8px 20px #2ee59d44}
+  .play:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 #0a6d47}
+  .auto{width:100%;margin-top:8px;padding:10px;font-weight:800;border-radius:10px;border:none;background:#2a2470;color:var(--text)}
+  .auto.running{background:var(--red);color:#fff}
+  .betrow .btn{min-width:42px}
+  .total{margin-top:8px;font-size:13px;color:var(--muted)}
+  .total b{color:var(--gold)}
+  label.chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+  label.chk input{width:18px;height:18px;accent-color:var(--gold)}
+  select{background:#0d0b2a;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px;font-family:inherit;font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{padding:4px 8px;text-align:left}
+  th{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  td:last-child,th:last-child{text-align:right;font-weight:700;color:var(--gold)}
+  tr.hl td{background:#2ee59d33;color:var(--green)}
+  tr.hl td:last-child{color:var(--green)}
+  .empty{color:var(--muted);font-size:13px;padding:6px 0}
+  .msg{min-height:22px;font-size:14px;text-align:center;color:var(--gold);margin:0 0 10px}
+  .msg.err{color:var(--red)}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}
+  .stats div{background:#0006;border-radius:8px;padding:6px 8px}
+  .stats span{display:block;color:var(--muted);font-size:11px}
+  .stats b{font-size:15px}
+  .link{background:none;border:none;color:var(--muted);text-decoration:underline;font-size:12px;padding:0}
+  .ballct{font-family:Bungee,sans-serif;color:var(--muted);font-size:13px}
+  .help{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>4-Card Keno</h1>
+    <div class="meters">
+      <div class="meter"><small>Balance</small><b id="credits">$0.00</b></div>
+      <div class="meter"><small>Total Bet</small><b id="totalBet">$0.00</b></div>
+      <div class="meter win" id="winMeter"><small>Win</small><b id="win">$0.00</b></div>
+    </div>
+  </header>
+  <p class="msg" id="msg">Mark 1–10 spots on all four cards, then press PLAY. One draw of 20 numbers is checked against all four cards.</p>
+
+  <div class="layout">
+    <div class="main"><div class="strip" id="strip"></div><div class="cards" id="cards"></div>
+      <div class="panel report" id="report" hidden>
+        <h3>Strategy breakdown</h3>
+        <div id="repHead"></div>
+        <div class="tscroll"><table id="repTable"></table></div>
+        <div id="repGuar"></div>
+        <details id="jsonBox"><summary>Setup as JSON</summary><pre id="jsonPre"></pre></details>
+        <button class="btn" id="jsonCopy" style="margin-top:8px;font-size:12px;padding:6px 10px">Copy JSON</button>
+      </div></div>
+
+    <aside>
+      <div class="panel">
+        <button class="play" id="playBtn">PLAY</button>
+        <div class="row" style="margin-top:8px">
+          <select id="autoCount" aria-label="Auto play rounds">
+            <option value="5">5 games</option><option value="10" selected>10 games</option>
+            <option value="25">25 games</option><option value="50">50 games</option><option value="100">100 games</option>
+          </select>
+          <button class="auto" id="autoBtn" style="flex:1;margin:0">AUTO PLAY</button>
+        </div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <span class="ballct" id="ballct">Ball 0 / 20</span>
+          <span class="row" style="gap:4px" id="speedRow"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Denomination</h3>
+        <div class="row betrow" id="denomRow"></div>
+        <h3 style="margin-top:12px">Credits per card</h3>
+        <div class="row">
+          <button class="btn betup" id="multBtn">BET UP</button>
+          <div class="pips" id="pips"><i>1x</i><i>2x</i><i>3x</i><i>4x</i></div>
+        </div>
+        <div class="total" id="betMath"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Picks</h3>
+        <label class="chk"><input type="checkbox" id="sync"> Copy my marks to all 4 cards</label>
+        <div class="row" style="margin-top:10px">
+          <select id="qpCount" aria-label="Quick pick spots"></select>
+          <button class="btn" id="qpBtn" style="flex:1">Quick Pick</button>
+          <button class="btn" id="clearBtn">Clear</button>
+        </div>
+        <p class="help" style="margin-top:8px" id="pickHelp"></p>
+      </div>
+
+      <div class="panel">
+        <h3>Master Wheel strategy</h3>
+                <div id="tab-ms">
+          <div class="field">Variant<select id="msVar">
+            <option value="3">3-Spot · 4-number master</option><option value="5">5-Spot · 6-number master</option>
+            <option value="7" selected>7-Spot · 9-number master</option><option value="9">9-Spot · 11-number master</option></select></div>
+          <div class="field">Master block<select id="msZone">
+            <option value="example">Example</option><option value="tl">Top-Left zone</option><option value="tr">Top-Right zone</option>
+            <option value="bl">Bottom-Left zone</option><option value="br">Bottom-Right zone</option><option value="ct">Center zone</option>
+            <option value="rand">Random quadrant</option><option value="any">Anywhere</option><option value="cardA">Card A's marks</option></select></div>
+          <div class="sum" id="msSum"></div>
+          <button class="btn stbtn" id="msBtn">Build master wheel</button>
+          <p class="help" style="margin-top:8px" id="msHelp"></p>
+          <p class="help">The master block is shaded on every card. Anchors (on all 4 cards) are outlined in orange. See the guarantee table under the cards.</p>
+        </div>
+        <p class="help" style="margin-top:6px;font-style:italic">Every draw is random. A wheel changes how your wins are spread across cards, not the odds of any number coming up.</p>
+      </div>
+
+      <div class="panel">
+        <h3 id="payTitle">Pays — Card 1</h3>
+        <div id="paytable"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Session</h3>
+        <div class="stats">
+          <div><span>Games</span><b id="sGames">0</b></div>
+          <div><span>Biggest win</span><b id="sBest">0</b></div>
+          <div><span>Wagered</span><b id="sBet">0</b></div>
+          <div><span>Won</span><b id="sWon">0</b></div>
+        </div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <label class="chk" style="font-size:13px"><input type="checkbox" id="sound" checked> Sound</label>
+          <button class="link" id="resetBtn">Reset balance &amp; stats</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+  <p class="foot">For fun only — no real money. All four cards are always played at the same bet: total bet = card bet × 4. Each card pays independently.</p>
+</div>
+
+<script>
+(() => {
+  // Pay table: spots marked -> { catch: pays per 1 credit bet }
+  const PAY = {
+    1:{1:3},
+    2:{2:15},
+    3:{2:2,3:46},
+    4:{2:1,3:5,4:91},
+    5:{3:3,4:12,5:810},
+    6:{3:1,4:4,5:70,6:1600},
+    7:{3:1,4:2,5:21,6:400,7:7000},
+    8:{5:12,6:98,7:1652,8:10000},
+    9:{4:1,5:6,6:44,7:335,8:4700,9:10000},
+    10:{5:5,6:24,7:142,8:1000,9:4500,10:10000}
+  };
+  const DENOMS = [1, 5, 25, 100];   // cents
+  const money = c => '$' + (c / 100).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const SPEEDS = {Slow:220, Normal:110, Fast:35, Instant:0};
+  const START = 10000;   // $100.00, all money kept in whole cents
+  const NAMES = ['A','B','C','D'];
+
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k,d){ try{ const v = localStorage.getItem('keno4_'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+    set(k,v){ try{ localStorage.setItem('keno4_'+k, JSON.stringify(v)); }catch(e){} }
+  };
+
+  const S = {
+    credits: store.get('cents', START),
+    stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0}),
+    denom: store.get('denom', 25), mult: store.get('mult', 1),
+    speed: store.get('speed', 'Normal'),
+    sync: false, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
+    draw: [], shown: 0, done: false,
+    cards: [0,1,2,3].map(i => ({picks:new Set(), active:true, bet: 0, hits:0, win:0}))
+  };
+  if (!(S.speed in SPEEDS)) S.speed = 'Normal';
+  if (!(S.credits > 0)) S.credits = START;
+  if (!DENOMS.includes(S.denom)) S.denom = 25;
+  if (!(S.mult >= 1 && S.mult <= 4)) S.mult = 1;
+  // One bet for every card: denomination × credits per card (in cents)
+  function applyBet(){ S.cards.forEach(c => { c.bet = S.denom * S.mult; c.active = true; }); store.set('denom', S.denom); store.set('mult', S.mult); }
+  applyBet();
+
+  // ---------- Sound ----------
+  let actx = null;
+  function beep(freq, dur=0.08, type='sine', vol=0.06){
+    if (!$('sound').checked) return;
+    try{
+      actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+      o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
+    }catch(e){}
+  }
+
+  // ---------- Build DOM ----------
+  const cells = [], cardEls = [];
+  S.cards.forEach((c, ci) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `
+      <div class="chead">
+        <span class="name">Card ${NAMES[ci]}</span>
+        <span class="info"></span>
+        <span class="cardbet"></span>
+      </div>
+      <div class="grid g1"></div><div class="grid split g2"></div>
+      <div class="badge"></div>`;
+    const g1 = el.querySelector('.g1'), g2 = el.querySelector('.g2');
+    cells[ci] = [];
+    for (let n = 1; n <= 80; n++){
+      const b = document.createElement('button');
+      b.className = 'n'; b.textContent = n;
+      b.setAttribute('aria-label', `Card ${NAMES[ci]} number ${n}`);
+      b.addEventListener('click', () => toggleNum(ci, n));
+      (n <= 40 ? g1 : g2).appendChild(b);
+      cells[ci][n] = b;
+    }
+    el.addEventListener('click', () => { if (S.focus !== ci){ S.focus = ci; renderFocus(); } });
+    $('cards').appendChild(el);
+    cardEls[ci] = el;
+  });
+
+  DENOMS.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'btn'; btn.textContent = d < 100 ? d + '¢' : '$1'; btn.dataset.denom = d; btn.style.flex = '1';
+    btn.addEventListener('click', () => {
+      if (S.playing || S.autoLeft) return;
+      S.denom = d; applyBet(); say(`Denomination ${money(d)} · card bet ${money(d * S.mult)} · total ${money(d * S.mult * 4)}.`); render();
+    });
+    $('denomRow').appendChild(btn);
+  });
+  $('multBtn').addEventListener('click', () => {
+    if (S.playing || S.autoLeft) return;
+    S.mult = S.mult % 4 + 1; applyBet(); beep(400 + S.mult * 120, 0.06, 'triangle');
+    say(`${S.mult}x credits per card · card bet ${money(S.denom * S.mult)} · total ${money(S.denom * S.mult * 4)}.`); render();
+  });
+  Object.keys(SPEEDS).forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'btn'; btn.textContent = s; btn.dataset.speed = s;
+    btn.style.cssText = 'padding:4px 7px;font-size:11px';
+    btn.addEventListener('click', () => { S.speed = s; store.set('speed', s); render(); });
+    $('speedRow').appendChild(btn);
+  });
+  for (let i = 1; i <= 10; i++){
+    const o = document.createElement('option'); o.value = i; o.textContent = i + (i===1?' spot':' spots');
+    if (i === 7) o.selected = true;
+    $('qpCount').appendChild(o);
+  }
+
+  // ---------- Logic ----------
+  function say(t, err){ const m = $('msg'); m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); }
+  // All four cards must be in play: total bet is always card bet × 4
+  function playable(){ return S.cards.every(c => c.picks.size > 0) ? S.cards : []; }
+  const cardBet = () => S.denom * S.mult, totalBet = () => cardBet() * 4;
+
+  function clearResults(){
+    S.draw = []; S.shown = 0; S.done = false; S.lastWin = 0;
+    S.cards.forEach(c => { c.hits = 0; c.win = 0; });
+    cells.forEach(row => row.forEach(b => b && b.classList.remove('drawn','hit')));
+  }
+
+  function toggleNum(ci, n){
+    if (S.playing || S.autoLeft) return;
+    S.focus = ci;
+    const card = S.cards[ci];
+    const had = card.picks.has(n);
+    if (!had && card.picks.size >= 10){ say(`Card ${NAMES[ci]} already has 10 spots (the maximum).`, true); renderFocus(); return; }
+    const targets = S.sync ? [0,1,2,3] : [ci];
+    targets.forEach(i => {
+      const p = S.cards[i].picks;
+      if (had) p.delete(n); else if (p.size < 10) p.add(n);
+    });
+    beep(had ? 330 : 520, 0.05, 'triangle', 0.04);
+    S.strategy = null; clearResults();
+    const k = card.picks.size;
+    say(k ? `Card ${NAMES[ci]}: ${k} spot${k>1?'s':''} marked.` : `Card ${NAMES[ci]} is empty.`);
+    render();
+  }
+
+  function randomSet(k){
+    const pool = Array.from({length:80}, (_,i) => i+1);
+    for (let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    return pool.slice(0, k);
+  }
+
+  function quickPick(){
+    if (S.playing || S.autoLeft) return;
+    const k = +$('qpCount').value;
+    if (S.sync){
+      const set = randomSet(k);
+      S.cards.forEach(c => c.picks = new Set(set));
+      say(`Quick picked the same ${k} spots on all cards.`);
+    } else {
+      S.cards[S.focus].picks = new Set(randomSet(k));
+      say(`Quick picked ${k} spots on Card ${NAMES[S.focus]}.`);
+    }
+    S.strategy = null; clearResults(); beep(660, 0.08, 'triangle'); render();
+  }
+
+  function clearPicks(){
+    if (S.playing || S.autoLeft) return;
+    const targets = S.sync ? S.cards : [S.cards[S.focus]];
+    targets.forEach(c => c.picks.clear());
+    S.strategy = null; clearResults(); say(S.sync ? 'All cards cleared.' : `Card ${NAMES[S.focus]} cleared.`); render();
+  }
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function playRound(){
+    const act = playable();
+    const empty = S.cards.map((c, i) => c.picks.size ? null : NAMES[i]).filter(Boolean);
+    if (empty.length){ say(`All 4 cards must be played — mark spots on Card ${empty.join(', ')}.`, true); return false; }
+    const cost = act.reduce((t, c) => t + c.bet, 0);
+    if (act.length !== 4 || cost !== totalBet() || S.cards.some(c => c.bet !== cardBet())){ say('Bet error: total bet must equal card bet × 4.', true); return false; }
+    if (S.credits < cost){ say(`Not enough balance — this round costs ${money(cost)}.`, true); return false; }
+
+    S.playing = true; clearResults();
+    S.credits -= cost; S.stats.bet += cost; S.stats.games++;
+    S.draw = randomSet(20);
+    say('Drawing 20 numbers…'); render();
+
+    // One shared draw, revealed on every card at once
+    const delay = SPEEDS[S.speed];
+    for (let r = 0; r < 20; r++){
+      const n = S.draw[r];
+      let anyHit = false;
+      S.cards.forEach((c, ci) => {
+        const el = cells[ci][n];
+        el.classList.add('drawn');
+        if (c.active && c.picks.has(n)){ el.classList.add('hit'); c.hits++; anyHit = true; }
+      });
+      S.shown = r + 1;
+      renderStrip(); renderInfo();
+      if (delay){
+        beep(anyHit ? 880 + r*15 : 240, anyHit ? 0.1 : 0.03, anyHit ? 'sine' : 'square', anyHit ? 0.06 : 0.015);
+        await sleep(delay);
+      }
+    }
+
+    // Each card is evaluated independently against the same draw
+    let total = 0;
+    act.forEach(c => { c.win = (PAY[c.picks.size][c.hits] || 0) * c.bet; total += c.win; });
+    S.done = true;
+    S.credits += total; S.lastWin = total;
+    S.stats.won += total; S.stats.best = Math.max(S.stats.best, total);
+    store.set('cents', S.credits); store.set('stats_usd', S.stats);
+
+    const winners = S.cards.map((c, i) => c.win > 0 ? `${NAMES[i]} +${money(c.win)}` : null).filter(Boolean);
+    if (total > 0){
+      say(`Won ${money(total)} on ${winners.length} card${winners.length>1?'s':''} (${winners.join(', ')}).`);
+      [523,659,784,1047].forEach((f,i) => setTimeout(() => beep(f, 0.15, 'triangle', 0.07), i*90));
+      const m = $('winMeter'); m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
+    } else {
+      say('No winning cards this draw.');
+    }
+    S.playing = false; render();
+    return true;
+  }
+
+  async function autoPlay(){
+    if (S.autoLeft > 0){ S.autoLeft = 0; render(); return; }
+    S.autoLeft = +$('autoCount').value; render();
+    while (S.autoLeft > 0){
+      const ok = await playRound();
+      if (!ok){ S.autoLeft = 0; break; }
+      S.autoLeft--; render();
+      if (S.autoLeft > 0) await sleep(SPEEDS[S.speed] ? 1100 : 400);
+    }
+    S.autoLeft = 0; render();
+  }
+
+  // ---------- Render ----------
+  function renderStrip(){
+    const st = $('strip');
+    let h = '<span class="lbl">Draw</span>';
+    for (let i = 0; i < 20; i++){
+      h += i < S.shown ? `<span class="ball"${i < S.shown - 1 ? ' style="animation:none"' : ''}>${S.draw[i]}</span>` : '<span class="ball ph"></span>';
+    }
+    st.innerHTML = h;
+    $('ballct').textContent = `Ball ${S.shown} / 20`;
+  }
+
+  let renderInfo = function(){
+    S.cards.forEach((c, ci) => {
+      const k = c.picks.size;
+      let info = `<b>${k}</b> spot${k===1?'':'s'}`;
+      if (S.shown && c.active && k) info += ` · Hit <b>${c.hits}</b>`;
+      cardEls[ci].querySelector('.info').innerHTML = info;
+    });
+  };
+
+  function renderFocus(){
+    S.cards.forEach((c, ci) => cardEls[ci].classList.toggle('focus', ci === S.focus));
+    const c = S.cards[S.focus], k = c.picks.size;
+    $('payTitle').textContent = `Pays — Card ${NAMES[S.focus]}` + (k ? ` (${k} spot${k>1?'s':''}, ${money(c.bet)} bet)` : '');
+    const pt = $('paytable');
+    if (!k){ pt.innerHTML = '<div class="empty">Mark spots on this card to see what it pays. Click any card to view its pay table.</div>'; return; }
+    const rows = Object.entries(PAY[k]).sort((a,b) => b[0]-a[0]);
+    pt.innerHTML = `<table><tr><th>Catch</th><th>Pays</th></tr>` +
+      rows.map(([h, p]) => `<tr class="${S.done && c.active && c.hits == h ? 'hl' : ''}"><td>${h} of ${k}</td><td>${money(p*c.bet)}</td></tr>`).join('') +
+      `</table>`;
+  }
+
+  let render = function(){
+    const busy = S.playing || S.autoLeft > 0;
+    S.cards.forEach((c, ci) => {
+      const el = cardEls[ci];
+      el.classList.toggle('off', !c.active);
+      el.classList.toggle('won', S.done && c.win > 0);
+      el.querySelector('.badge').textContent = c.win > 0 ? `WIN ${money(c.win)}` : '';
+      el.querySelector('.cardbet').textContent = `BET ${money(c.bet)}`;
+      for (let n = 1; n <= 80; n++) cells[ci][n].classList.toggle('picked', c.picks.has(n));
+    });
+    renderStrip(); renderInfo(); renderFocus();
+
+    const act = playable();
+    $('credits').textContent = money(S.credits);
+    $('totalBet').textContent = money(totalBet());
+    $('win').textContent = money(S.lastWin);
+    document.querySelectorAll('[data-denom]').forEach(b => { b.classList.toggle('sel', +b.dataset.denom === S.denom); b.disabled = busy; });
+    document.querySelectorAll('#pips i').forEach((p, i) => p.classList.toggle('on', i < S.mult));
+    $('multBtn').disabled = busy;
+    $('multBtn').textContent = S.mult === 4 ? 'BET UP ↺' : 'BET UP';
+    const ready = act.length === 4;
+    $('betMath').innerHTML = `${money(S.denom)} × ${S.mult} credit${S.mult>1?'s':''} = <b>${money(cardBet())}</b> per card · × 4 cards = <b>${money(totalBet())}</b>` +
+      (ready ? '' : `<br><span style="color:var(--red)">Mark spots on all 4 cards to play.</span>`);
+    document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('sel', b.dataset.speed === S.speed));
+    $('playBtn').disabled = busy || act.length !== 4 || S.credits < totalBet();
+    const ab = $('autoBtn');
+    ab.classList.toggle('running', S.autoLeft > 0);
+    ab.textContent = S.autoLeft > 0 ? `STOP (${S.autoLeft} left)` : 'AUTO PLAY';
+    ab.disabled = S.playing && S.autoLeft === 0;
+    ['qpBtn','clearBtn','sync','qpCount','autoCount'].forEach(id => $(id).disabled = busy);
+    $('qpBtn').textContent = S.sync ? 'Quick Pick all' : `Quick Pick ${NAMES[S.focus]}`;
+    $('clearBtn').textContent = S.sync ? 'Clear all' : `Clear ${NAMES[S.focus]}`;
+    $('pickHelp').textContent = S.sync
+      ? 'Marks you make on any card are copied to all four.'
+      : 'Each card has its own numbers. Click a card to select it for Quick Pick and Clear.';
+    $('sGames').textContent = S.stats.games.toLocaleString();
+    $('sBet').textContent = money(S.stats.bet);
+    $('sWon').textContent = money(S.stats.won);
+    $('sBest').textContent = money(S.stats.best);
+  };
+
+  // ---------- Strategies ----------
+  const num = (r, c) => r * 10 + c + 1;
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const fmt = a => '[' + a.join(', ') + ']';
+
+  // 4-row × 5-column zones
+  const ZONES = {
+    tl:{name:'Top-Left',     r0:0, c0:0},
+    tr:{name:'Top-Right',    r0:0, c0:5},
+    bl:{name:'Bottom-Left',  r0:4, c0:0},
+    br:{name:'Bottom-Right', r0:4, c0:5},
+    ct:{name:'Center',       r0:2, c0:3}
+  };
+  const zoneNums = k => { const z = ZONES[k], a = []; for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) a.push(num(z.r0 + r, z.c0 + c)); return a; };
+
+  // ----- Master Wheel: one master array, each card drops specific elements -----
+  const LET = 'ABCDEFGHIJK';
+  const MASTER = {
+    3:{label:'3-Spot · "4-Number Master"',  n:4,  spots:3, drops:[[0],[1],[2],[3]],
+       shape:[[0,0],[0,1],[1,0],[1,1]], example:[6,7,16,17]},
+    5:{label:'5-Spot · "6-Number Master"',  n:6,  spots:5, drops:[[0],[1],[2],[3]],
+       shape:[[0,0],[0,1],[1,0],[1,1],[2,0],[2,1]], example:[6,7,16,17,26,27]},
+    7:{label:'7-Spot · "9-Number Master"',  n:9,  spots:7, drops:[[0,1],[2,3],[4,5],[6,7]],
+       shape:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]], example:[6,7,8,16,17,18,26,27,28]},
+    9:{label:'9-Spot · "11-Number Master"', n:11, spots:9, drops:[[0,1],[2,3],[4,5],[6,7]],
+       shape:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,0],[3,1]], example:[6,7,8,16,17,18,26,27,28,36,37]}
+  };
+  const masterAnchors = v => { const d = new Set(MASTER[v].drops.flat()); return [...Array(MASTER[v].n).keys()].filter(i => !d.has(i)); };
+  const masterCard = (v, master, ci) => master.filter((_, i) => !MASTER[v].drops[ci].includes(i));
+  const dropText = (v, ci) => MASTER[v].drops[ci].map(i => LET[i]).join('+');
+
+  function placeBlock(shape, zk){
+    const h = Math.max(...shape.map(c => c[0])) + 1, w = Math.max(...shape.map(c => c[1])) + 1;
+    let r0 = 0, r1 = 7, c0 = 0, c1 = 9;
+    if (zk !== 'any'){ const z = ZONES[zk]; r0 = z.r0; r1 = z.r0 + 3; c0 = z.c0; c1 = z.c0 + 4; }
+    const r = rint(r0, r1 - h + 1), c = rint(c0, c1 - w + 1);
+    return shape.map(([dr, dc]) => num(r + dr, c + dc));
+  }
+
+  // Exact outcomes for every way h of the n master numbers can hit
+  function guarantees(v){
+    const M = MASTER[v], rows = [];
+    const bets = S.cards.map(c => c.bet);
+    for (let h = M.n; h >= 0; h--){
+      let minBest = 99, maxBest = -1, perfect = 0, combos = 0, minPay = Infinity, maxPay = 0, allPay = 0;
+      for (let mask = 0; mask < (1 << M.n); mask++){
+        let pc = 0; for (let x = mask; x; x &= x - 1) pc++;
+        if (pc !== h) continue;
+        combos++;
+        let best = 0, pay = 0, payingCards = 0;
+        for (let ci = 0; ci < 4; ci++){
+          let hits = 0;
+          for (let i = 0; i < M.n; i++) if ((mask >> i & 1) && !M.drops[ci].includes(i)) hits++;
+          best = Math.max(best, hits);
+          const p = (PAY[M.spots][hits] || 0) * bets[ci];
+          pay += p; if (p > 0) payingCards++;
+        }
+        if (payingCards === 4) allPay++;
+        if (best === M.spots) perfect++;
+        minBest = Math.min(minBest, best); maxBest = Math.max(maxBest, best);
+        minPay = Math.min(minPay, pay); maxPay = Math.max(maxPay, pay);
+      }
+      rows.push({h, minBest, maxBest, perfect: perfect / combos, allPay: allPay / combos, minPay, maxPay});
+      if (maxPay === 0) break;
+    }
+    return rows;
+  }
+
+  const MS_TEXT = {
+    3: 'Every card plays 3 of your 4 master numbers. If 3 of the 4 hit, one card catches 3/3 and the other three catch 2/3. All 4 hit and every card catches 3/3.',
+    5: 'E and F are on every card. If both anchors and 3 of A–D hit, one card catches 5/5 and the other three catch 4/5, so all four cards pay.',
+    7: 'Every master number is on at least 3 cards. If 7 of 9 hit, a 7/7 card needs your 2 misses to be one card\'s dropped pair (A+B, C+D, E+F or G+H). Otherwise the best card is 6/7. If 8 of 9 hit, a 7/7 is guaranteed unless the miss is anchor I.',
+    9: 'I, J and K are on every card. If 9 of 11 hit, a 9/9 card needs your 2 misses to be one card\'s dropped pair. Otherwise the best card is 8/9. If 10 of 11 hit, a 9/9 is guaranteed unless the miss is an anchor (I, J or K).'
+  };
+
+  function updateMsSum(){
+    const v = +$('msVar').value, M = MASTER[v], an = masterAnchors(v);
+    const z = $('msZone').value;
+    let ok = true;
+    if (z === 'cardA' && S.cards[0].picks.size !== M.n){ ok = false; $('msSum').textContent = `Mark exactly ${M.n} numbers on Card A (it has ${S.cards[0].picks.size}).`; }
+    else $('msSum').textContent = `${M.n}-number master → four ${M.spots}-spot cards · drops ${M.drops.map(d => d.map(i => LET[i]).join('+')).join(' / ')}` + (an.length ? ` · anchor${an.length > 1 ? 's' : ''} ${an.map(i => LET[i]).join(', ')}` : '');
+    $('msSum').style.color = ok ? '' : 'var(--red)';
+    $('msBtn').disabled = !ok || S.playing || S.autoLeft > 0;
+    $('msHelp').textContent = MS_TEXT[v];
+    const ex = $('msZone').querySelector('[value="example"]');
+    ex.textContent = `Example ${fmt(M.example)}`;
+  }
+
+  function buildMaster(){
+    if (S.playing || S.autoLeft) return;
+    const v = +$('msVar').value, M = MASTER[v];
+    let z = $('msZone').value, master;
+    if (z === 'example') master = [...M.example];
+    else if (z === 'cardA'){ if (S.cards[0].picks.size !== M.n) return; master = [...S.cards[0].picks].sort((a, b) => a - b); }
+    else { if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)]; master = placeBlock(M.shape, z); }
+    S.cards.forEach((c, ci) => { c.picks = new Set(masterCard(v, master, ci)); c.active = true; });
+    S.strategy = {type:'master', v, master};
+    finishStrategy(`Master Wheel ${M.label}: master ${fmt(master)} → four ${M.spots}-spot cards.`);
+  }
+
+  function finishStrategy(text){
+    S.sync = false; $('sync').checked = false;
+    clearResults(); beep(700, 0.1, 'triangle'); say(text); render();
+  }
+
+  // ----- JSON export (same shape as the strategy specs) -----
+  function strategyJSON(){
+    const st = S.strategy; if (!st) return null;
+    const sorted = s => [...s];
+  }
+
+  // ----- Round breakdown -----
+  function renderReport(){
+    const el = $('report'), st = S.strategy;
+    if (!st){ el.hidden = true; return; }
+    el.hidden = false;
+    const live = S.shown > 0, drawn = new Set(S.draw.slice(0, S.shown));
+    const pays = c => !c.active ? '<span class="dim">off</span>' : S.done ? (c.win ? `<b class="g">${money(c.win)}</b>` : '$0.00') : '—';
+    let head = '', rows = '';
+    if (st.type === 'master'){
+      const M = MASTER[st.v], an = new Set(masterAnchors(st.v));
+      const mHit = st.master.filter(n => drawn.has(n)).length;
+      head = `<b>${M.n}-Number Master Wheel</b> (${M.spots}-spot) — master ` +
+        '<span class="chips">' + st.master.map((n, i) => `<i class="${drawn.has(n) ? 'on' : ''}${an.has(i) ? ' anc' : ''}"><sup>${LET[i]}</sup>${n}</i>`).join('') + '</span>';
+      if (live){
+        const g = guarantees(st.v).find(x => x.h === mHit);
+        head += `<div class="hl2">Master caught <b>${mHit} / ${M.n}</b>.</div>`;
+      }
+      rows = `<tr><th>Card</th><th>Drops</th><th>Plays</th><th>Hits</th><th>Pays</th></tr>` +
+        S.cards.map((c, ci) => {
+          const nums = masterCard(st.v, st.master, ci), h = nums.filter(n => drawn.has(n)).length;
+          return `<tr><td>${NAMES[ci]}</td><td>${dropText(st.v, ci)} (${M.drops[ci].map(i => st.master[i]).join(', ')})</td><td>${chips(nums, drawn)}</td>` +
+                 `<td>${live ? `<b>${h}</b> of ${M.spots}` : '—'}</td><td>${pays(c)}</td></tr>`;
+        }).join('');
+      const G = guarantees(st.v);
+      const mh = live ? mHit : -1;
+      $('repGuar').innerHTML = `<h3 style="margin-top:14px">What each master catch guarantees <span class="dim" style="text-transform:none;letter-spacing:0">(at the current bet, every way it can happen)</span></h3>` +
+        `<div class="tscroll"><table class="gt"><tr><th>Master hits</th><th>Best card</th><th>Top-prize card</th><th>All 4 pay</th><th>Total pays</th></tr>` +
+        G.map(g => `<tr class="${g.h === mh ? 'cur' : ''}"><td>${g.h} of ${M.n}</td><td>${g.minBest === g.maxBest ? g.minBest : g.minBest + '–' + g.maxBest} of ${M.spots}</td>` +
+          `<td>${pct(g.perfect)}</td><td>${pct(g.allPay)}</td><td>${g.minPay === g.maxPay ? money(g.minPay) : money(g.minPay) + '–' + money(g.maxPay)}</td></tr>`).join('') +
+        `</table></div>`;
+    }
+    if (st.type !== 'master') $('repGuar').innerHTML = '';
+    $('repHead').innerHTML = head;
+    $('repTable').innerHTML = rows;
+    if ($('jsonBox').open) $('jsonPre').textContent = JSON.stringify(strategyJSON(), null, 2);
+  }
+  const pct = x => x === 1 ? 'Always' : x === 0 ? 'Never' : Math.round(x * 100) + '%';
+  function chips(list, drawn){
+    return '<span class="chips">' + list.map(n => `<i class="${drawn.has(n) ? 'on' : ''}">${n}</i>`).join('') + '</span>';
+  }
+
+  function markBoard(){
+    const st = S.strategy;
+    const anchor = st && st.type === 'master' ? new Set(masterAnchors(st.v).map(i => st.master[i])) : new Set();
+    const zoneSets = st && st.type === 'master' ? [0,1,2,3].map(() => new Set(st.master)) : null;
+    cells.forEach((row, ci) => row.forEach((b, n) => {
+      if (!b) return;
+      b.classList.toggle('core', anchor.has(n) && S.cards[ci].picks.has(n));
+      b.classList.toggle('zone', !!zoneSets && zoneSets[ci].has(n));
+    }));
+  }
+
+  ['msVar','msZone'].forEach(id => $(id).addEventListener('change', updateMsSum));
+  $('msBtn').addEventListener('click', buildMaster);
+  $('jsonBox').addEventListener('toggle', renderReport);
+  $('jsonCopy').addEventListener('click', async () => {
+    const txt = JSON.stringify(strategyJSON(), null, 2);
+    try { await navigator.clipboard.writeText(txt); $('jsonCopy').textContent = 'Copied!'; }
+    catch(e){ $('jsonBox').open = true; $('jsonCopy').textContent = 'Select the text above to copy'; }
+    setTimeout(() => $('jsonCopy').textContent = 'Copy JSON', 1800);
+  });
+
+  const _render = render;
+  render = function(){
+    _render(); markBoard(); updateMsSum(); renderReport();
+    const busy = S.playing || S.autoLeft > 0;
+    ['msVar','msZone'].forEach(id => $(id).disabled = busy);
+  };
+  const _renderInfo = renderInfo;
+  renderInfo = function(){ _renderInfo(); if (S.strategy) renderReport(); };
+
+
+  // ---------- Wire up ----------
+  $('playBtn').addEventListener('click', playRound);
+  $('autoBtn').addEventListener('click', autoPlay);
+  $('qpBtn').addEventListener('click', quickPick);
+  $('clearBtn').addEventListener('click', clearPicks);
+  $('sync').addEventListener('change', e => {
+    S.sync = e.target.checked;
+    if (S.sync){
+      const src = [...S.cards[S.focus].picks];
+      S.cards.forEach(c => c.picks = new Set(src));
+      S.strategy = null; clearResults(); say(`Card ${NAMES[S.focus]}'s marks copied to all cards.`);
+    }
+    render();
+  });
+  $('resetBtn').addEventListener('click', () => {
+    if (S.playing || S.autoLeft) return;
+    S.credits = START; S.stats = {games:0,bet:0,won:0,best:0};
+    store.set('cents', S.credits); store.set('stats_usd', S.stats);
+    clearResults(); say(`Balance reset to ${money(START)}.`); render();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body){ e.preventDefault(); if (!S.playing && !S.autoLeft) playRound(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
