@@ -179,6 +179,22 @@
      filter:drop-shadow(0 4px 0 #7a3b00) drop-shadow(0 0 24px #ffcc33aa);animation:wobble .6s ease-in-out infinite alternate}
   #bigwin .bw-a{font-family:Bungee,sans-serif;font-size:clamp(28px,5vw,52px);color:#2ee59d;text-shadow:0 3px 0 #0a6d47,0 0 20px #2ee59d88}
   @keyframes wobble{from{transform:rotate(-3deg) scale(1)}to{transform:rotate(3deg) scale(1.06)}}
+  .boardrow{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:stretch}
+  .boardcol{min-width:0}
+  .winlog{display:flex;flex-direction:column;margin-top:44px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:8px}
+  .winlog .wlh{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:2px 4px 6px}
+  .wl{flex:1;display:grid;grid-template-rows:repeat(8,1fr);gap:4px;min-height:420px}
+  .we{border-radius:8px;background:#0006;border:1px solid var(--line);padding:4px 8px;display:flex;flex-direction:column;justify-content:center;min-height:0;overflow:hidden}
+  .we.empty{border-style:dashed;opacity:.35}
+  .we .wt{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .we .wa{font-family:Bungee,sans-serif;color:var(--green);font-size:15px}
+  .we .wg{font-size:10px;color:var(--muted)}
+  .we .wc{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .we.big{background:linear-gradient(90deg,#ffcc3333,#0006);border-color:var(--gold)}
+  .we.big .wa{color:var(--gold)}
+  .we.newest{animation:wlin .5s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes wlin{from{transform:translateX(-20px);opacity:0}to{transform:none;opacity:1}}
+  @media (max-width:760px){.boardrow{grid-template-columns:1fr}.winlog{order:2;margin-top:0}.wl{min-height:0;grid-template-rows:none}}
   aside{display:flex;flex-direction:column;gap:12px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
   .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -231,7 +247,10 @@
   <p class="msg" id="msg">Mark 1–10 spots on all four cards, then press PLAY. One draw of 20 numbers is checked against all four cards.</p>
 
   <div class="layout">
-    <div class="main"><div class="strip" id="strip"></div><div class="ctabs" id="ctabs" role="tablist"></div><div class="cards" id="cards"></div>
+    <div class="main"><div class="strip" id="strip"></div><div class="boardrow">
+        <div class="winlog" aria-label="Recent wins"><div class="wlh">Recent Wins</div><div class="wl" id="winList"></div></div>
+        <div class="boardcol"><div class="ctabs" id="ctabs" role="tablist"></div><div class="cards" id="cards"></div></div>
+      </div>
       <div class="panel" id="chartPanel" hidden>
         <h3 id="chTitle"></h3>
         <div class="help" id="chDesc"></div>
@@ -368,7 +387,7 @@
     stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0}),
     denom: store.get('denom', 25), mult: store.get('mult', 1),
     speed: store.get('speed', 'Normal'),
-    sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
+    wins: store.get('wins', []), sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
     draw: [], shown: 0, done: false,
     cards: [0,1,2,3].map(i => ({picks:new Set(), active:true, bet: 0, hits:0, win:0}))
   };
@@ -669,6 +688,11 @@
     store.set('cents', S.credits); store.set('stats_usd', S.stats);
 
     const winners = S.cards.map((c, i) => c.win > 0 ? `${NAMES[i]} +${money(c.win)}` : null).filter(Boolean);
+    if (total > 0){
+      S.wins.unshift({g: S.stats.games, total, at: Date.now(),
+        cards: S.cards.map((c, i) => c.win > 0 ? {i, hits: c.hits, k: c.picks.size, win: c.win} : null).filter(Boolean)});
+      S.wins = S.wins.slice(0, 8); S.newWin = true; store.set('wins', S.wins);
+    }
     if (total >= BIG_WIN){
       say(`BIG WIN! ${money(total)} on ${winners.length} card${winners.length>1?'s':''} (${winners.join(', ')}).`);
       celebrate(total);
@@ -743,6 +767,17 @@
       `</table>`;
   }
 
+  function renderWins(){
+    const list = $('winList'); let h = '';
+    for (let i = 0; i < 8; i++){
+      const w = S.wins[i];
+      if (!w){ h += '<div class="we empty"></div>'; continue; }
+      const cards = w.cards.map(c => `<span style="color:${COLORS[c.i]}">${NAMES[c.i]}</span> ${c.hits}/${c.k}`).join(' · ');
+      h += `<div class="we${w.total >= BIG_WIN ? ' big' : ''}${i === 0 && S.newWin ? ' newest' : ''}" title="Game ${w.g}: ${w.cards.map(c => NAMES[c.i] + ' caught ' + c.hits + ' of ' + c.k + ' for ' + money(c.win)).join(', ')}">` +
+           `<div class="wt"><span class="wa">${money(w.total)}</span><span class="wg">Game ${w.g}</span></div><div class="wc">${cards}</div></div>`;
+    }
+    list.innerHTML = h; S.newWin = false;
+  }
   let render = function(){
     const busy = S.playing || S.autoLeft > 0;
     S.cards.forEach((c, ci) => {
@@ -753,7 +788,7 @@
       el.querySelector('.cardbet').textContent = `BET ${money(c.bet)}`;
       for (let n = 1; n <= 80; n++) cells[ci][n].classList.toggle('picked', c.picks.has(n));
     });
-    renderStrip(); renderInfo(); renderFocus();
+    renderStrip(); renderInfo(); renderFocus(); renderWins();
 
     const act = playable();
     $('credits').textContent = money(S.credits);
@@ -1120,7 +1155,7 @@
   });
   $('resetBtn').addEventListener('click', () => {
     if (S.playing || S.autoLeft) return;
-    S.credits = START; S.stats = {games:0,bet:0,won:0,best:0};
+    S.credits = START; S.stats = {games:0,bet:0,won:0,best:0}; S.wins = []; store.set('wins', S.wins);
     store.set('cents', S.credits); store.set('stats_usd', S.stats);
     clearResults(); say(`Balance reset to ${money(START)}.`); render();
   });
