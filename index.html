@@ -59,8 +59,19 @@
   .n.m.cov.all{background:#2b2350;box-shadow:inset 0 0 0 2px #ffcc3366}
   .n.m.empty{color:#4e4a80}
   .n.m.drawn{background:var(--drawn)}
-  .n.m.mhit{background:#3d3300;box-shadow:0 0 0 2px var(--gold),0 0 14px #ffcc3399;animation:hit .35s ease}
-  .n.m.mhit .mn{color:#ffe9a8}
+  .n.m.cov.mhit,.n.m.cov.all.mhit{background:radial-gradient(circle at 50% 45%,#fff6c8,var(--gold) 55%,var(--gold2));box-shadow:0 0 0 2px #fff,0 0 16px #ffcc33cc;animation:hit .35s ease}
+  .n.m.mhit .mn{color:#7a3b00}
+  .n.m.mhit .ml.star{color:#3a1d00}
+  .n.m.mhit .ml span{text-shadow:0 0 2px #000,0 0 3px #000,0 0 4px #000}
+  .mwins{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+  .mwins .mw{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;padding:5px 8px;font-size:12px;background:#0006;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .mwins .mw b.l{color:var(--c);font-family:Bungee,sans-serif;font-weight:400}
+  .mwins .mw .h{color:var(--muted)}
+  .mwins .mw .p{font-weight:800;color:var(--muted)}
+  .mwins .mw.win{background:#2ee59d1f;border-color:var(--green);border-left-color:var(--c)}
+  .mwins .mw.win .p{color:var(--green)}
+  .card.master .badge{font-size:clamp(18px,2.6vw,26px);line-height:1.25;text-align:center}
+  .card.master .badge small{display:block;font-family:Rubik,sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px}
 
   .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:10px;position:relative;transition:border-color .2s,opacity .2s}
   .card{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent)}
@@ -385,7 +396,9 @@
   masterEl.innerHTML = `
     <div class="chead"><span class="name">Master</span><span class="info"></span>
       <span class="legend"><span><b style="color:var(--gold)">*</b> shared by 2+ cards</span>${NAMES.map((L, i) => `<b style="color:${COLORS[i]}">${L}</b>`).join(' ')}<span>= card</span></span></div>
-    <div class="grid mg1"></div><div class="grid split mg2"></div>`;
+    <div class="mwins"></div>
+    <div class="grid mg1"></div><div class="grid split mg2"></div>
+    <div class="badge"></div>`;
   for (let n = 1; n <= 80; n++){
     const b = document.createElement('div');
     b.className = 'n m';
@@ -418,6 +431,17 @@
     masterEl.querySelector('.info').innerHTML = info;
     mTab.querySelector('.ts').innerHTML = covered ? (S.shown ? `Hit <b>${hit}</b> of ${covered}` : `<b>${covered}</b> covered`) : 'combined';
     const total = S.cards.reduce((t, c) => t + c.win, 0);
+    // Per-card results row + win badge on the master board
+    masterEl.querySelector('.mwins').innerHTML = S.cards.map((c, i) => {
+      const k = c.picks.size;
+      const h = S.shown && k ? `Hit ${c.hits}/${k}` : `${k} spot${k === 1 ? '' : 's'}`;
+      const p = S.done ? (c.win > 0 ? '+' + money(c.win) : '$0.00') : '';
+      return `<div class="mw${S.done && c.win > 0 ? ' win' : ''}" style="--c:${COLORS[i]}"><b class="l">${NAMES[i]}</b><span class="h">${h}</span><span class="p">${p}</span></div>`;
+    }).join('');
+    const winners = S.cards.map((c, i) => c.win > 0 ? `<span style="color:${COLORS[i]}">${NAMES[i]}</span>` : '').filter(Boolean);
+    masterEl.querySelector('.badge').innerHTML = total > 0
+      ? `WIN ${money(total)}<small>${winners.join(' · ')} paid</small>` : '';
+    masterEl.classList.toggle('won', S.done && total > 0);
     mTab.classList.toggle('won', S.done && total > 0);
     mTab.querySelector('.tw').textContent = total > 0 ? '+' + money(total) : '';
   }
