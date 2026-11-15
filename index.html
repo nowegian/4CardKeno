@@ -248,7 +248,8 @@
             <option value="example">Example</option><option value="tl">Top-Left zone</option><option value="tr">Top-Right zone</option>
             <option value="bl">Bottom-Left zone</option><option value="br">Bottom-Right zone</option><option value="ct">Center zone</option>
             <option value="rand">Random quadrant</option><option value="any">Anywhere</option></select></div>
-          <div class="field" id="msExtraRow">Added numbers<select id="msExtra"><option value="touch">Touching my picks</option><option value="rand">Random</option></select></div>
+          <div class="field" id="msExtraRow">Added numbers<select id="msExtra"><option value="near" selected>Near my picks (random shape)</option><option value="touch">Touching my picks</option><option value="rand">Anywhere on the board</option></select></div>
+          <div class="field" id="msShapeRow">Shape<select id="msShape"><option value="scatter" selected>Random shape</option><option value="block">Tight block</option></select></div>
           <div class="sum" id="msSum"></div>
           <button class="btn stbtn" id="msBtn">Fill cards B–D for me</button>
           <p class="help" style="margin-top:8px" id="msHelp"></p>
@@ -702,6 +703,17 @@
   const extraCount = v => MASTER[v].n - MASTER[v].spots;
   function addExtras(picks, k, mode){
     const have = new Set(picks), out = [];
+    if (mode === 'near'){
+      const near = new Set();
+      picks.forEach(n => {
+        const r = Math.floor((n - 1) / 10), c = (n - 1) % 10;
+        for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++){
+          const rr = r + dr, cc = c + dc;
+          if (rr >= 0 && rr < 8 && cc >= 0 && cc < 10 && !have.has(num(rr, cc))) near.add(num(rr, cc));
+        }
+      });
+      shuffle([...near]).slice(0, k).forEach(n => { out.push(n); have.add(n); });
+    }
     if (mode === 'touch'){
       const score = new Map();
       picks.forEach(n => {
@@ -725,6 +737,7 @@
     const v = +$('msVar').value, M = MASTER[v], an = masterAnchors(v), k = extraCount(v);
     const z = $('msZone').value, have = S.cards[0].picks.size;
     $('msExtraRow').style.display = z === 'mine' ? '' : 'none';
+    $('msShapeRow').style.display = z === 'mine' || z === 'example' ? 'none' : '';
     let ok = true;
     if (z === 'mine' && have !== M.spots){ ok = false; $('msSum').textContent = `Mark exactly ${M.spots} numbers on Card A (it has ${have}). The wheel adds ${k} more to cover ${M.n}.`; }
     else $('msSum').textContent = `Pick ${M.spots} → cover ${M.n} with 4 cards (${k} added) · drops ${M.drops.map(d => d.map(i => LET[i]).join('+')).join(' / ')}` + (an.length ? ` · anchor${an.length > 1 ? 's' : ''} ${an.map(i => LET[i]).join(', ')}` : '');
@@ -742,13 +755,19 @@
     if (z === 'example') master = [...M.example];
     else if (z === 'mine'){
       if (S.cards[0].picks.size !== M.spots) return;
-      const mine = [...S.cards[0].picks].sort((a, b) => a - b);
+      // Shuffle the player's numbers so each rebuild drops different ones on B–D
+      const mine = shuffle([...S.cards[0].picks]);
       master = [...addExtras(mine, extraCount(v), $('msExtra').value), ...mine];
     }
-    else { if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)]; master = placeBlock(M.shape, z); }
+    else {
+      if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)];
+      master = $('msShape').value === 'block' ? placeBlock(M.shape, z)
+             : shuffle(z === 'any' ? randomSet(80) : zoneNums(z)).slice(0, M.n);   // random shape inside the zone
+    }
     S.cards.forEach((c, ci) => { c.picks = new Set(masterCard(v, master, ci)); c.active = true; });
     const k = extraCount(v);
-    finishStrategy(`Card A ${fmt(master.slice(k))} + added ${fmt(master.slice(0, k))} → B–D filled to cover ${M.n}. Change any card freely — the breakdown re-checks your wheel.`);
+    const srt = a => [...a].sort((x, y) => x - y);
+    finishStrategy(`Card A ${fmt(srt(master.slice(k)))} + added ${fmt(srt(master.slice(0, k)))} → B–D filled to cover ${M.n}. Change any card freely — the breakdown re-checks your wheel.`);
   }
 
   function finishStrategy(text){
@@ -885,7 +904,7 @@
     }));
   }
 
-  ['msVar','msZone','msExtra'].forEach(id => $(id).addEventListener('change', updateMsSum));
+  ['msVar','msZone','msExtra','msShape'].forEach(id => $(id).addEventListener('change', updateMsSum));
   $('msBtn').addEventListener('click', buildMaster);
   $('jsonBox').addEventListener('toggle', renderReport);
   $('jsonCopy').addEventListener('click', async () => {
@@ -900,7 +919,7 @@
     S.strategy = analyzeWheel();
     _render(); markBoard(); updateMsSum(); renderReport();
     const busy = S.playing || S.autoLeft > 0;
-    ['msVar','msZone','msExtra'].forEach(id => $(id).disabled = busy);
+    ['msVar','msZone','msExtra','msShape'].forEach(id => $(id).disabled = busy);
   };
   const _renderInfo = renderInfo;
   renderInfo = function(){ _renderInfo(); if (S.strategy) renderReport(); };
