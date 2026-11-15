@@ -26,7 +26,7 @@
   .meter small{display:block;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
   .meter b{font-family:Bungee,sans-serif;font-weight:400;font-size:22px;color:var(--gold)}
   .meter.win b{color:var(--green)}
-  .meter.win.pop{animation:pop .6s ease}
+  .meter.win.pop,.meter.pop{animation:pop .6s ease}
   @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.18);box-shadow:0 0 30px var(--green)}100%{transform:scale(1)}}
 
   .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
@@ -164,6 +164,9 @@
   .pips i{flex:1;text-align:center;font-style:normal;font-weight:800;font-size:13px;padding:7px 0;border-radius:8px;background:#0006;color:var(--muted);border:1px solid var(--line)}
   .pips i.on{background:var(--gold);color:#3a1d00;border-color:var(--gold)}
   .cardbet{font-size:11px;color:var(--gold);font-weight:700;background:#0006;border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+  .addcash{width:100%;margin-top:8px;padding:9px;font-weight:800;background:linear-gradient(180deg,#ffe28a,var(--gold) 50%,var(--gold2));color:#3a1d00;border:none;box-shadow:0 3px 0 #9a5a00}
+  .addcash:hover:not(:disabled){filter:brightness(1.08)}
+  .addcash:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #9a5a00}
   aside{display:flex;flex-direction:column;gap:12px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
   .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -232,6 +235,7 @@
     <aside>
       <div class="panel">
         <button class="play" id="playBtn">PLAY</button>
+        <button class="btn addcash" id="addBtn">+ Add $100</button>
         <div class="row" style="margin-top:8px">
           <select id="autoCount" aria-label="Auto play rounds">
             <option value="5">5 games</option><option value="10" selected>10 games</option>
@@ -1022,6 +1026,13 @@
       S.strategy = null; clearResults(); say(`Card ${NAMES[S.focus]}'s marks copied to all cards.`);
     }
     render();
+  });
+  $('addBtn').addEventListener('click', () => {
+    if (S.playing) return;
+    S.credits += 10000; store.set('cents', S.credits);
+    [660, 880].forEach((f, i) => setTimeout(() => beep(f, 0.08, 'triangle', 0.06), i * 70));
+    const m = $('credits').parentElement; m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
+    say(`Added $100.00 — balance ${money(S.credits)}.`); render();
   });
   $('resetBtn').addEventListener('click', () => {
     if (S.playing || S.autoLeft) return;
