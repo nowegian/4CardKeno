@@ -24,6 +24,8 @@ Mark any numbers you like on all four cards — B, C and D don't have to be clus
 
 Example 7-spot wheel: A `53 54 62 63 71 73 74`, B `44 52 53 54 71 73 74`, C `44 52 53 54 62 63 71`, D `44 52 54 62 63 73 74` → covers 9, anchor 54.
 
+A **Master** tab shows all four cards combined: a number on every card shows `*`, any other covered number shows the letters of the cards that play it, in each card's color (A red, B green, C blue, D yellow).
+
 There's also a helper that fills B–D from Card A by adding the cover numbers, which you can then edit.
 
 The game shows an exact guarantee table (computed over every way each master catch can happen), a per-round breakdown, and a JSON export of the setup.
