@@ -4,7 +4,7 @@ A single-page 4-Card Keno game. Open `index.html` in any browser — no build st
 
 ## How it plays
 - Four cards (A–D), each with its own 1–10 spots, played against **one shared draw of 20 numbers** from 1–80.
-- **Bet:** choose a denomination (1¢, 5¢, 25¢, $1) and 1x–4x credits per card. All four cards are always played at the same bet: **total bet = card bet × 4**.
+- **Bet:** choose a denomination (1¢, 5¢, 10¢, 25¢, $1, $5) and 1x–4x credits per card. All four cards are always played at the same bet: **total bet = card bet × 4**.
 - Each card is paid independently from the pay table × its bet.
 - Quick Pick, auto play (5–100 games), draw speeds, sound, and session stats.
 
