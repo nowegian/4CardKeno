@@ -234,9 +234,10 @@
             <option value="rand">Random quadrant</option><option value="any">Anywhere</option></select></div>
           <div class="field" id="msExtraRow">Added numbers<select id="msExtra"><option value="touch">Touching my picks</option><option value="rand">Random</option></select></div>
           <div class="sum" id="msSum"></div>
-          <button class="btn stbtn" id="msBtn">Build master wheel</button>
+          <button class="btn stbtn" id="msBtn">Fill cards B–D for me</button>
           <p class="help" style="margin-top:8px" id="msHelp"></p>
-          <p class="help">Card A plays exactly your numbers. Cards B–D each drop some of yours to swap in the added numbers, so together the 4 cards cover the whole master. Master numbers are shaded; anchors (on all 4 cards) are outlined in orange. Press Build again to re-roll the added numbers.</p>
+          <p class="help"><b>Build it yourself:</b> mark any numbers you like on all four tabs — the cards don't have to look like Card A. The breakdown under the cards reads your 4 cards, letters the numbers they cover from each card's drops (A+B, C+D…), marks anchors (on every card) in orange, checks whether it's a standard wheel, and lists exact guarantees for your cards.</p>
+          <p class="help"><b>Or let it fill:</b> mark Card A and press the button to add the cover numbers and fill B–D; then edit them as you like.</p>
         </div>
         <p class="help" style="margin-top:6px;font-style:italic">Every draw is random. A wheel changes how your wins are spread across cards, not the odds of any number coming up.</p>
       </div>
@@ -627,35 +628,6 @@
     return shape.map(([dr, dc]) => num(r + dr, c + dc));
   }
 
-  // Exact outcomes for every way h of the n master numbers can hit
-  function guarantees(v){
-    const M = MASTER[v], rows = [];
-    const bets = S.cards.map(c => c.bet);
-    for (let h = M.n; h >= 0; h--){
-      let minBest = 99, maxBest = -1, perfect = 0, combos = 0, minPay = Infinity, maxPay = 0, allPay = 0;
-      for (let mask = 0; mask < (1 << M.n); mask++){
-        let pc = 0; for (let x = mask; x; x &= x - 1) pc++;
-        if (pc !== h) continue;
-        combos++;
-        let best = 0, pay = 0, payingCards = 0;
-        for (let ci = 0; ci < 4; ci++){
-          let hits = 0;
-          for (let i = 0; i < M.n; i++) if ((mask >> i & 1) && !M.drops[ci].includes(i)) hits++;
-          best = Math.max(best, hits);
-          const p = (PAY[M.spots][hits] || 0) * bets[ci];
-          pay += p; if (p > 0) payingCards++;
-        }
-        if (payingCards === 4) allPay++;
-        if (best === M.spots) perfect++;
-        minBest = Math.min(minBest, best); maxBest = Math.max(maxBest, best);
-        minPay = Math.min(minPay, pay); maxPay = Math.max(maxPay, pay);
-      }
-      rows.push({h, minBest, maxBest, perfect: perfect / combos, allPay: allPay / combos, minPay, maxPay});
-      if (maxPay === 0) break;
-    }
-    return rows;
-  }
-
   const MS_TEXT = {
     3: 'Every card plays 3 of your 4 master numbers. If 3 of the 4 hit, one card catches 3/3 and the other three catch 2/3. All 4 hit and every card catches 3/3.',
     5: 'E and F are on every card. If both anchors and 3 of A–D hit, one card catches 5/5 and the other three catch 4/5, so all four cards pay.',
@@ -713,9 +685,8 @@
     }
     else { if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)]; master = placeBlock(M.shape, z); }
     S.cards.forEach((c, ci) => { c.picks = new Set(masterCard(v, master, ci)); c.active = true; });
-    S.strategy = {type:'master', v, master};
     const k = extraCount(v);
-    finishStrategy(`Your ${M.spots} numbers ${fmt(master.slice(k))} + added ${fmt(master.slice(0, k))} → 4 cards covering ${M.n} numbers.`);
+    finishStrategy(`Card A ${fmt(master.slice(k))} + added ${fmt(master.slice(0, k))} → B–D filled to cover ${M.n}. Change any card freely — the breakdown re-checks your wheel.`);
   }
 
   function finishStrategy(text){
@@ -723,46 +694,116 @@
     clearResults(); beep(700, 0.1, 'triangle'); say(text); render();
   }
 
-  // ----- JSON export (same shape as the strategy specs) -----
+  // ----- Read the wheel straight from the four cards the player marked -----
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const letter = i => i < 26 ? LETTERS[i] : '#' + (i + 1);
+
+  function analyzeWheel(){
+    const sets = S.cards.map(c => [...c.picks].sort((a, b) => a - b));
+    if (sets.some(s => !s.length)) return null;
+    const union = [...new Set(sets.flat())].sort((a, b) => a - b);
+    const drops = sets.map(s => union.filter(n => !s.includes(n)));
+    const anchors = union.filter(n => sets.every(s => s.includes(n)));
+    // Letter the master the same way the drop rules do: Card A's dropped numbers first (A, B…),
+    // then Card B's, C's, D's, and the anchors (on every card) last.
+    const master = [];
+    drops.forEach(d => d.forEach(n => { if (!master.includes(n)) master.push(n); }));
+    anchors.forEach(n => master.push(n));
+    const L = new Map(master.map((n, i) => [n, letter(i)]));
+    const sizes = new Set(sets.map(s => s.length)), k = sets[0].length, M = MASTER[k];
+    const issues = [];
+    if (sizes.size > 1) issues.push('the cards have different spot counts');
+    else if (!M) issues.push('standard wheels are 3, 5, 7 or 9 spots');
+    else {
+      if (union.length !== M.n) issues.push(`covers ${union.length} numbers (a ${k}-spot wheel covers ${M.n})`);
+      const dsz = M.drops[0].length;
+      if (drops.some(d => d.length !== dsz)) issues.push(`each card should leave out exactly ${dsz} of the ${M.n}`);
+      const all = drops.flat();
+      if (new Set(all).size !== all.length) issues.push('two cards leave out the same number');
+    }
+    return {sets, union, master, anchors, drops, L, k: sizes.size === 1 ? k : null,
+            valid: !issues.length, issues, isWheel: union.length > Math.max(...sets.map(s => s.length))};
+  }
+
+  // Exact outcomes for every way h of the covered numbers can hit, for the cards as marked
+  let gCache = {key:'', rows:null};
+  function guarantees(w){
+    const n = w.master.length;
+    if (n > 16) return null;
+    const bets = S.cards.map(c => c.bet);
+    const key = JSON.stringify([w.master, w.sets, bets]);
+    if (gCache.key === key) return gCache.rows;
+    const idx = new Map(w.master.map((x, i) => [x, i]));
+    const cm = w.sets.map(s => s.reduce((m, x) => m | (1 << idx.get(x)), 0));
+    const sz = w.sets.map(s => s.length);
+    const pc = x => { let c = 0; for (; x; x &= x - 1) c++; return c; };
+    const acc = [];
+    for (let h = 0; h <= n; h++) acc.push({h, minBest:99, maxBest:-1, perfect:0, combos:0, minPay:Infinity, maxPay:0, allPay:0});
+    for (let mask = 0; mask < (1 << n); mask++){
+      const a = acc[pc(mask)];
+      let best = 0, pay = 0, paying = 0, perfect = false;
+      for (let ci = 0; ci < 4; ci++){
+        const hits = pc(mask & cm[ci]);
+        best = Math.max(best, hits);
+        if (hits === sz[ci]) perfect = true;
+        const p = (PAY[sz[ci]][hits] || 0) * bets[ci];
+        pay += p; if (p > 0) paying++;
+      }
+      a.combos++; if (perfect) a.perfect++; if (paying === 4) a.allPay++;
+      a.minBest = Math.min(a.minBest, best); a.maxBest = Math.max(a.maxBest, best);
+      a.minPay = Math.min(a.minPay, pay); a.maxPay = Math.max(a.maxPay, pay);
+    }
+    const rows = [];
+    for (let h = n; h >= 0; h--){
+      const a = acc[h];
+      rows.push({h, minBest:a.minBest, maxBest:a.maxBest, perfect:a.perfect / a.combos, allPay:a.allPay / a.combos, minPay:a.minPay, maxPay:a.maxPay});
+      if (a.maxPay === 0) break;
+    }
+    gCache = {key, rows};
+    return rows;
+  }
+
+  // ----- JSON export -----
   function strategyJSON(){
-    const st = S.strategy; if (!st) return null;
-    const sorted = s => [...s];
+    const w = S.strategy; if (!w) return null;
+    const letters = {}; w.master.forEach(n => letters[w.L.get(n)] = n);
+    return {
+      strategyName: `${w.k ? w.k + '-Spot ' : ''}Wheel covering ${w.union.length}`,
+      standardWheel: w.valid, totalCards: 4, spotsPerCard: w.k || w.sets.map(s => s.length),
+      masterArray: w.master, letters, anchors: w.anchors,
+      cards: w.sets.map((s, ci) => ({cardId: ci + 1, dropped: w.drops[ci], droppedElements: w.drops[ci].map(n => w.L.get(n)), finalSelection: s}))
+    };
   }
 
   // ----- Round breakdown -----
   function renderReport(){
-    const el = $('report'), st = S.strategy;
-    if (!st){ el.hidden = true; return; }
+    const el = $('report'), w = S.strategy;
+    if (!w || !w.isWheel){ el.hidden = true; return; }
     el.hidden = false;
     const live = S.shown > 0, drawn = new Set(S.draw.slice(0, S.shown));
-    const pays = c => !c.active ? '<span class="dim">off</span>' : S.done ? (c.win ? `<b class="g">${money(c.win)}</b>` : '$0.00') : '—';
-    let head = '', rows = '';
-    if (st.type === 'master'){
-      const M = MASTER[st.v], an = new Set(masterAnchors(st.v));
-      const mHit = st.master.filter(n => drawn.has(n)).length;
-      head = `<b>${M.spots}-Spot Wheel covering ${M.n}</b> — master ` +
-        '<span class="chips">' + st.master.map((n, i) => `<i class="${drawn.has(n) ? 'on' : ''}${an.has(i) ? ' anc' : ''}"><sup>${LET[i]}</sup>${n}</i>`).join('') + '</span>';
-      { const k = extraCount(st.v);
-        head += `<div class="hl2">Your ${M.spots}: ${chips(st.master.slice(k), drawn)} &nbsp;+ added: ${chips(st.master.slice(0, k), drawn)} → ${M.n} numbers covered by 4 cards</div>`; }
-      if (live){
-        const g = guarantees(st.v).find(x => x.h === mHit);
-        head += `<div class="hl2">Master caught <b>${mHit} / ${M.n}</b>.</div>`;
-      }
-      rows = `<tr><th>Card</th><th>Drops</th><th>Plays</th><th>Hits</th><th>Pays</th></tr>` +
-        S.cards.map((c, ci) => {
-          const nums = masterCard(st.v, st.master, ci), h = nums.filter(n => drawn.has(n)).length;
-          return `<tr><td>${NAMES[ci]}</td><td>${dropText(st.v, ci)} (${M.drops[ci].map(i => st.master[i]).join(', ')})</td><td>${chips(nums, drawn)}</td>` +
-                 `<td>${live ? `<b>${h}</b> of ${M.spots}` : '—'}</td><td>${pays(c)}</td></tr>`;
-        }).join('');
-      const G = guarantees(st.v);
-      const mh = live ? mHit : -1;
-      $('repGuar').innerHTML = `<h3 style="margin-top:14px">What each master catch guarantees <span class="dim" style="text-transform:none;letter-spacing:0">(at the current bet, every way it can happen)</span></h3>` +
-        `<div class="tscroll"><table class="gt"><tr><th>Master hits</th><th>Best card</th><th>Top-prize card</th><th>All 4 pay</th><th>Total pays</th></tr>` +
-        G.map(g => `<tr class="${g.h === mh ? 'cur' : ''}"><td>${g.h} of ${M.n}</td><td>${g.minBest === g.maxBest ? g.minBest : g.minBest + '–' + g.maxBest} of ${M.spots}</td>` +
-          `<td>${pct(g.perfect)}</td><td>${pct(g.allPay)}</td><td>${g.minPay === g.maxPay ? money(g.minPay) : money(g.minPay) + '–' + money(g.maxPay)}</td></tr>`).join('') +
-        `</table></div>`;
-    }
-    if (st.type !== 'master') $('repGuar').innerHTML = '';
+    const pays = c => S.done ? (c.win ? `<b class="g">${money(c.win)}</b>` : '$0.00') : '—';
+    const an = new Set(w.anchors), n = w.union.length;
+    const mHit = w.union.filter(x => drawn.has(x)).length;
+    let head = `<b>Your wheel</b> — 4 cards${w.k ? ` × ${w.k} spots` : ''} cover <b>${n}</b> numbers: ` +
+      '<span class="chips">' + w.master.map(x => `<i class="${drawn.has(x) ? 'on' : ''}${an.has(x) ? ' anc' : ''}"><sup>${w.L.get(x)}</sup>${x}</i>`).join('') + '</span>';
+    head += w.valid
+      ? `<div class="hl2" style="color:var(--green)">✓ Standard ${w.k}-spot wheel covering ${n} · drops ${w.drops.map(d => d.map(x => w.L.get(x)).join('+')).join(' / ')}` +
+        (w.anchors.length ? ` · anchor${w.anchors.length > 1 ? 's' : ''} ${w.anchors.map(x => w.L.get(x)).join(', ')}` : '') + '</div>'
+      : `<div class="hl2" style="color:var(--gold2)">Custom wheel — ${w.issues.join('; ')}. Guarantees below are still exact for these cards.</div>`;
+    if (live) head += `<div class="hl2">Covered numbers caught: <b>${mHit} / ${n}</b>.</div>`;
+    const rows = `<tr><th>Card</th><th>Leaves out</th><th>Plays</th><th>Hits</th><th>Pays</th></tr>` +
+      S.cards.map((c, ci) => {
+        const s = w.sets[ci], h = s.filter(x => drawn.has(x)).length, d = w.drops[ci];
+        return `<tr><td style="color:${COLORS[ci]};font-weight:800">${NAMES[ci]}</td><td>${d.length ? d.map(x => w.L.get(x)).join('+') + ' (' + d.join(', ') + ')' : '—'}</td>` +
+               `<td>${chips(s, drawn)}</td><td>${live ? `<b>${h}</b> of ${s.length}` : '—'}</td><td>${pays(c)}</td></tr>`;
+      }).join('');
+    const G = guarantees(w), mh = live ? mHit : -1;
+    $('repGuar').innerHTML = !G ? `<p class="help" style="margin-top:12px">Your cards cover ${n} numbers — too many to list every outcome (16 max).</p>` :
+      `<h3 style="margin-top:14px">What each catch guarantees <span class="dim" style="text-transform:none;letter-spacing:0">(these exact cards at the current bet, every way it can happen)</span></h3>` +
+      `<div class="tscroll"><table class="gt"><tr><th>Covered hits</th><th>Best card</th><th>Top-prize card</th><th>All 4 pay</th><th>Total pays</th></tr>` +
+      G.map(g => `<tr class="${g.h === mh ? 'cur' : ''}"><td>${g.h} of ${n}</td><td>${g.minBest === g.maxBest ? g.minBest : g.minBest + '–' + g.maxBest}${w.k ? ' of ' + w.k : ' hits'}</td>` +
+        `<td>${pct(g.perfect)}</td><td>${pct(g.allPay)}</td><td>${g.minPay === g.maxPay ? money(g.minPay) : money(g.minPay) + '–' + money(g.maxPay)}</td></tr>`).join('') +
+      `</table></div>`;
     $('repHead').innerHTML = head;
     $('repTable').innerHTML = rows;
     if ($('jsonBox').open) $('jsonPre').textContent = JSON.stringify(strategyJSON(), null, 2);
@@ -773,13 +814,12 @@
   }
 
   function markBoard(){
-    const st = S.strategy;
-    const anchor = st && st.type === 'master' ? new Set(masterAnchors(st.v).map(i => st.master[i])) : new Set();
-    const zoneSets = st && st.type === 'master' ? [0,1,2,3].map(() => new Set(st.master)) : null;
+    const w = S.strategy && S.strategy.isWheel ? S.strategy : null;
+    const anchor = new Set(w ? w.anchors : []), cover = new Set(w ? w.union : []);
     cells.forEach((row, ci) => row.forEach((b, n) => {
       if (!b) return;
       b.classList.toggle('core', anchor.has(n) && S.cards[ci].picks.has(n));
-      b.classList.toggle('zone', !!zoneSets && zoneSets[ci].has(n));
+      b.classList.toggle('zone', cover.has(n));
     }));
   }
 
@@ -795,6 +835,7 @@
 
   const _render = render;
   render = function(){
+    S.strategy = analyzeWheel();
     _render(); markBoard(); updateMsSum(); renderReport();
     const busy = S.playing || S.autoLeft > 0;
     ['msVar','msZone','msExtra'].forEach(id => $(id).disabled = busy);

@@ -9,16 +9,22 @@ A single-page 4-Card Keno game. Open `index.html` in any browser — no build st
 - Quick Pick, auto play (5–100 games), draw speeds, sound, and session stats.
 
 ## Master Wheel strategy
-Pick only your spot count on Card A; the wheel adds the extra numbers (touching your picks, or random) so the four cards together cover the larger master:
+Mark any numbers you like on all four cards — B, C and D don't have to be clustered with Card A. The game reads your four cards as a wheel:
 
-| Variant | You pick | Wheel adds | Covered | Card drops | Anchors (on all cards) |
-|---|---|---|---|---|---|
-| 3-Spot | 3 | 1 | 4 | A / B / C / D | — |
-| 5-Spot | 5 | 1 | 6 | A / B / C / D | E, F |
-| 7-Spot | 7 | 2 | 9 | A+B / C+D / E+F / G+H | I |
-| 9-Spot | 9 | 2 | 11 | A+B / C+D / E+F / G+H | I, J, K |
+- **Covered numbers** = every number on at least one card.
+- Numbers are lettered from each card's drops in order (Card A's left-out numbers are A, B…, then Card B's, C's, D's), with **anchors** (on every card) last.
+- It checks whether the cards form a standard wheel:
 
-The added numbers take the first master positions (A, or A+B), so Card A plays exactly your picks and Cards B–D each swap in the added numbers.
+| Variant | Each card | Covers | Each card leaves out | Anchors |
+|---|---|---|---|---|
+| 3-Spot | 3 | 4 | 1 (A / B / C / D) | — |
+| 5-Spot | 5 | 6 | 1 (A / B / C / D) | 2 |
+| 7-Spot | 7 | 9 | 2 (A+B / C+D / E+F / G+H) | 1 |
+| 9-Spot | 9 | 11 | 2 (A+B / C+D / E+F / G+H) | 3 |
+
+Example 7-spot wheel: A `53 54 62 63 71 73 74`, B `44 52 53 54 71 73 74`, C `44 52 53 54 62 63 71`, D `44 52 54 62 63 73 74` → covers 9, anchor 54.
+
+There's also a helper that fills B–D from Card A by adding the cover numbers, which you can then edit.
 
 The game shows an exact guarantee table (computed over every way each master catch can happen), a per-round breakdown, and a JSON export of the setup.
 
