@@ -164,9 +164,21 @@
   .pips i{flex:1;text-align:center;font-style:normal;font-weight:800;font-size:13px;padding:7px 0;border-radius:8px;background:#0006;color:var(--muted);border:1px solid var(--line)}
   .pips i.on{background:var(--gold);color:#3a1d00;border-color:var(--gold)}
   .cardbet{font-size:11px;color:var(--gold);font-weight:700;background:#0006;border:1px solid var(--line);border-radius:20px;padding:2px 8px}
-  .addcash{width:100%;margin-top:8px;padding:9px;font-weight:800;background:linear-gradient(180deg,#ffe28a,var(--gold) 50%,var(--gold2));color:#3a1d00;border:none;box-shadow:0 3px 0 #9a5a00}
-  .addcash:hover:not(:disabled){filter:brightness(1.08)}
-  .addcash:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #9a5a00}
+  .btn.addcash{width:100%;margin-top:8px;padding:9px;font-weight:800;background:linear-gradient(180deg,#ffe28a,var(--gold) 50%,var(--gold2));color:#3a1d00;border:none;box-shadow:0 3px 0 #9a5a00}
+  .btn.addcash:hover:not(:disabled){filter:brightness(1.08)}
+  .btn.addcash:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #9a5a00}
+  .pausebtn{margin-top:8px;background:#ffcc33;color:#3a1d00}
+  .pausebtn.paused{background:var(--green);color:#03281a;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{box-shadow:0 0 18px #2ee59d}}
+  #confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:50}
+  #bigwin{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.3);opacity:0;pointer-events:none;z-index:51;text-align:center;
+          transition:transform .45s cubic-bezier(.2,1.7,.4,1),opacity .3s}
+  #bigwin.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+  #bigwin .bw-t{font-family:Bungee,sans-serif;font-size:clamp(44px,9vw,96px);line-height:1;
+     background:linear-gradient(180deg,#fff7c2,#ffcc33 45%,#ff9f1c);-webkit-background-clip:text;background-clip:text;color:transparent;
+     filter:drop-shadow(0 4px 0 #7a3b00) drop-shadow(0 0 24px #ffcc33aa);animation:wobble .6s ease-in-out infinite alternate}
+  #bigwin .bw-a{font-family:Bungee,sans-serif;font-size:clamp(28px,5vw,52px);color:#2ee59d;text-shadow:0 3px 0 #0a6d47,0 0 20px #2ee59d88}
+  @keyframes wobble{from{transform:rotate(-3deg) scale(1)}to{transform:rotate(3deg) scale(1.06)}}
   aside{display:flex;flex-direction:column;gap:12px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
   .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -205,6 +217,8 @@
 </style>
 </head>
 <body>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div id="bigwin" aria-live="polite"><div class="bw-t">BIG WIN!</div><div class="bw-a" id="bwAmt"></div></div>
 <div class="wrap">
   <header>
     <h1>4-Card Keno</h1>
@@ -243,6 +257,7 @@
           </select>
           <button class="auto" id="autoBtn" style="flex:1;margin:0">AUTO PLAY</button>
         </div>
+        <button class="auto pausebtn" id="pauseBtn" hidden>❚❚ PAUSE</button>
         <div class="row" style="margin-top:10px;justify-content:space-between">
           <span class="ballct" id="ballct">Ball 0 / 20</span>
           <span class="row" style="gap:4px" id="speedRow"></span>
@@ -353,7 +368,7 @@
     stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0}),
     denom: store.get('denom', 25), mult: store.get('mult', 1),
     speed: store.get('speed', 'Normal'),
-    sync: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
+    sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
     draw: [], shown: 0, done: false,
     cards: [0,1,2,3].map(i => ({picks:new Set(), active:true, bet: 0, hits:0, win:0}))
   };
@@ -561,6 +576,57 @@
   }
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // Pause: auto play (and a draw in progress) waits here until resumed
+  const waitIfPaused = async () => { while (S.paused) await sleep(100); };
+
+  // ----- Big win celebration ($100+ in one round) -----
+  const BIG_WIN = 10000;   // cents
+  function fanfare(){
+    if (!$('sound').checked) return;
+    const seq = [[523,0],[659,110],[784,220],[1047,330],[784,470],[1047,560],[1319,680]];
+    seq.forEach(([f, t]) => setTimeout(() => { beep(f, 0.22, 'square', 0.035); beep(f * 2, 0.18, 'triangle', 0.03); }, t));
+    setTimeout(() => [523, 659, 784, 1047, 1319].forEach(f => beep(f, 1.4, 'triangle', 0.045)), 860);   // big chord
+    for (let i = 0; i < 18; i++) setTimeout(() => beep(1800 + Math.random() * 1600, 0.07, 'sine', 0.025), 900 + i * 85);   // coin sparkles
+  }
+  let confettiRun = 0;
+  function confetti(){
+    const cv = $('confetti'), ctx = cv.getContext && cv.getContext('2d'); if (!ctx) return;
+    const W = cv.width = innerWidth, H = cv.height = innerHeight, run = ++confettiRun;
+    const cols = [...COLORS, '#ffcc33', '#ffffff', '#b9b3ff'];
+    const piece = o => Object.assign({w: 6 + Math.random() * 8, h: 4 + Math.random() * 6, rot: Math.random() * 6,
+      vr: (Math.random() - .5) * .4, c: cols[Math.floor(Math.random() * cols.length)], drag: 0.99, g: 0.3, delay: 0}, o);
+    const parts = [];
+    for (let i = 0; i < 160; i++){   // two side cannons
+      const L = i % 2 === 0;
+      parts.push(piece({x: L ? -10 : W + 10, y: H * (0.6 + Math.random() * 0.3),
+        vx: (L ? 1 : -1) * (7 + Math.random() * 10), vy: -(12 + Math.random() * 12), delay: Math.random() * 400}));
+    }
+    for (let i = 0; i < 220; i++){   // confetti rain from the top
+      parts.push(piece({x: Math.random() * W, y: -20 - Math.random() * H * 0.6, vx: (Math.random() - .5) * 2,
+        vy: 2 + Math.random() * 3, drag: 0.995, g: 0.05, sway: Math.random() * 6.28}));
+    }
+    const t0 = performance.now();
+    (function frame(t){
+      if (run !== confettiRun) return;
+      const age = t - t0;
+      ctx.clearRect(0, 0, W, H);
+      parts.forEach(p => {
+        if (age < p.delay) return;
+        p.vy = Math.min(p.vy + p.g, 9); p.vx *= p.drag; p.x += p.vx + (p.sway != null ? Math.sin(age / 300 + p.sway) * 0.8 : 0); p.y += p.vy; p.rot += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.globalAlpha = Math.max(0, 1 - Math.max(0, age - 4200) / 1300);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.rot * 2)) + 1);
+        ctx.restore();
+      });
+      if (age < 5500) requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+    })(t0);
+  }
+  function celebrate(total){
+    $('bwAmt').textContent = money(total);
+    const bw = $('bigwin'); bw.classList.add('show');
+    setTimeout(() => bw.classList.remove('show'), 3200);
+    fanfare(); confetti();
+  }
 
   async function playRound(){
     const act = playable();
@@ -590,6 +656,7 @@
       if (delay){
         beep(anyHit ? 880 + r*15 : 240, anyHit ? 0.1 : 0.03, anyHit ? 'sine' : 'square', anyHit ? 0.06 : 0.015);
         await sleep(delay);
+        await waitIfPaused();
       }
     }
 
@@ -602,7 +669,11 @@
     store.set('cents', S.credits); store.set('stats_usd', S.stats);
 
     const winners = S.cards.map((c, i) => c.win > 0 ? `${NAMES[i]} +${money(c.win)}` : null).filter(Boolean);
-    if (total > 0){
+    if (total >= BIG_WIN){
+      say(`BIG WIN! ${money(total)} on ${winners.length} card${winners.length>1?'s':''} (${winners.join(', ')}).`);
+      celebrate(total);
+      const m = $('winMeter'); m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
+    } else if (total > 0){
       say(`Won ${money(total)} on ${winners.length} card${winners.length>1?'s':''} (${winners.join(', ')}).`);
       [523,659,784,1047].forEach((f,i) => setTimeout(() => beep(f, 0.15, 'triangle', 0.07), i*90));
       const m = $('winMeter'); m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop');
@@ -614,15 +685,23 @@
   }
 
   async function autoPlay(){
-    if (S.autoLeft > 0){ S.autoLeft = 0; render(); return; }
-    S.autoLeft = +$('autoCount').value; render();
+    if (S.autoLeft > 0){ S.autoLeft = 0; S.paused = false; render(); return; }
+    S.autoLeft = +$('autoCount').value; S.paused = false; render();
     while (S.autoLeft > 0){
+      await waitIfPaused();
+      if (S.autoLeft <= 0) break;
       const ok = await playRound();
       if (!ok){ S.autoLeft = 0; break; }
       S.autoLeft--; render();
-      if (S.autoLeft > 0) await sleep(SPEEDS[S.speed] ? 1100 : 400);
+      if (S.autoLeft > 0) await sleep(S.lastWin >= BIG_WIN ? 3500 : SPEEDS[S.speed] ? 1100 : 400);   // let a big win sink in
     }
-    S.autoLeft = 0; render();
+    S.autoLeft = 0; S.paused = false; render();
+  }
+  function togglePause(){
+    if (!S.autoLeft) return;
+    S.paused = !S.paused;
+    say(S.paused ? 'Auto play paused — press RESUME to continue.' : 'Auto play resumed.');
+    render();
   }
 
   // ---------- Render ----------
@@ -692,6 +771,10 @@
     const ab = $('autoBtn');
     ab.classList.toggle('running', S.autoLeft > 0);
     ab.textContent = S.autoLeft > 0 ? `STOP (${S.autoLeft} left)` : 'AUTO PLAY';
+    const pb = $('pauseBtn');
+    pb.hidden = !(S.autoLeft > 0);
+    pb.classList.toggle('paused', !!S.paused);
+    pb.textContent = S.paused ? '▶ RESUME' : '❚❚ PAUSE';
     ab.disabled = S.playing && S.autoLeft === 0;
     ['qpBtn','clearBtn','sync','qpCount','autoCount'].forEach(id => $(id).disabled = busy);
     $('qpBtn').textContent = S.sync ? 'Quick Pick all' : `Quick Pick ${NAMES[S.focus]}`;
@@ -1016,6 +1099,7 @@
   // ---------- Wire up ----------
   $('playBtn').addEventListener('click', playRound);
   $('autoBtn').addEventListener('click', autoPlay);
+  $('pauseBtn').addEventListener('click', togglePause);
   $('qpBtn').addEventListener('click', quickPick);
   $('clearBtn').addEventListener('click', clearPicks);
   $('sync').addEventListener('change', e => {
@@ -1041,6 +1125,7 @@
     clearResults(); say(`Balance reset to ${money(START)}.`); render();
   });
   document.addEventListener('keydown', e => {
+    if (e.code === 'KeyP' && S.autoLeft){ e.preventDefault(); togglePause(); return; }
     if (e.code === 'Space' && e.target === document.body){ e.preventDefault(); if (!S.playing && !S.autoLeft) playRound(); }
   });
 
