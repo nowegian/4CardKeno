@@ -31,15 +31,27 @@
 
   .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
   @media (max-width:980px){.layout{grid-template-columns:1fr}}
-  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media (max-width:640px){.cards{grid-template-columns:1fr}}
+  .cards{max-width:640px;width:100%;margin:0 auto}
+  .card{display:none}
+  .card.focus{display:block}
+  .ctabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:640px;width:100%;margin:0 auto -14px;position:relative;z-index:1}
+  .ctab{--c:#888;border:2px solid var(--c);border-bottom:none;border-radius:12px 12px 0 0;padding:8px 6px 18px;text-align:center;
+        background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,#0b0a1f),#0b0a1f);color:var(--text);opacity:.6;transition:opacity .15s,transform .15s;position:relative}
+  .ctab:hover{opacity:.85}
+  .ctab.sel{opacity:1;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 45%,#15123a),#1c1848);transform:translateY(-3px)}
+  .ctab .tn{display:block;font-family:Bungee,sans-serif;font-size:16px;color:var(--c)}
+  .ctab .ts{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+  .ctab .ts b{color:var(--text)}
+  .ctab .tw{position:absolute;top:-9px;right:-4px;background:var(--green);color:#03281a;font-weight:800;font-size:10px;padding:2px 6px;border-radius:10px;display:none}
+  .ctab.won .tw{display:block}
+  .ctab.empty .ts{color:var(--red)}
 
   .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:10px;position:relative;transition:border-color .2s,opacity .2s}
-  .card.focus{border-color:#6b62e0}
+  .card{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent)}
   .card.off{opacity:.42}
   .card.won{border-color:var(--green);box-shadow:0 0 18px #2ee59d55}
   .chead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
-  .chead .name{font-family:Bungee,sans-serif;font-size:15px;color:var(--gold)}
+  .chead .name{font-family:Bungee,sans-serif;font-size:15px;color:var(--c)}
   .chead .info{color:var(--muted);flex:1}
   .chead .info b{color:var(--text)}
   .toggle{border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800;letter-spacing:1px;background:#0006;color:var(--muted);border:1px solid var(--line)}
@@ -50,11 +62,11 @@
      display:flex;align-items:center;justify-content:center;transition:background .12s,transform .12s;position:relative}
   .n:hover{background:#26215c}
   .n.zone{background:#272062;box-shadow:inset 0 0 0 1px #4b42a8}
-  .n.picked{background:var(--pick);color:#fff;box-shadow:inset 0 -2px 0 #0004}
+  .n.picked{background:var(--c);color:var(--ct,#fff);box-shadow:inset 0 -2px 0 #0004}
   .n.drawn{background:var(--drawn);color:#fff}
   .n.drawn::after{content:"";position:absolute;inset:18%;border-radius:50%;border:2px solid #ffffff55}
-  .n.picked.drawn{background:#3d7bff;}
-  .n.hit{background:radial-gradient(circle at 35% 30%,#fff6c8,var(--hit) 45%,var(--gold2));color:#3a1d00;animation:hit .35s ease;box-shadow:0 0 10px #ffcc3399}
+  .n.picked.drawn{background:var(--c)}
+  .n.hit{background:radial-gradient(circle at 50% 45%,#fff 0 30%,var(--c) 75%);color:#111;animation:hit .35s ease;box-shadow:0 0 0 2px #fff,0 0 14px var(--c)}
   .n.hit::after{border-color:#7a3b0066}
   @keyframes hit{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
   .badge{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;
@@ -161,7 +173,7 @@
   <p class="msg" id="msg">Mark 1–10 spots on all four cards, then press PLAY. One draw of 20 numbers is checked against all four cards.</p>
 
   <div class="layout">
-    <div class="main"><div class="strip" id="strip"></div><div class="cards" id="cards"></div>
+    <div class="main"><div class="strip" id="strip"></div><div class="ctabs" id="ctabs" role="tablist"></div><div class="cards" id="cards"></div>
       <div class="panel report" id="report" hidden>
         <h3>Strategy breakdown</h3>
         <div id="repHead"></div>
@@ -270,6 +282,8 @@
   const SPEEDS = {Slow:220, Normal:110, Fast:35, Instant:0};
   const START = 10000;   // $100.00, all money kept in whole cents
   const NAMES = ['A','B','C','D'];
+  const COLORS = ['#ff4d5e', '#2ee57a', '#3d8bff', '#ffd23f'];   // red, green, blue, yellow
+  const CTEXT  = ['#fff', '#062b14', '#fff', '#3a2a00'];
 
   const $ = id => document.getElementById(id);
   const store = {
@@ -309,10 +323,18 @@
   }
 
   // ---------- Build DOM ----------
-  const cells = [], cardEls = [];
+  const cells = [], cardEls = [], tabEls = [];
   S.cards.forEach((c, ci) => {
     const el = document.createElement('div');
     el.className = 'card';
+    el.style.setProperty('--c', COLORS[ci]); el.style.setProperty('--ct', CTEXT[ci]);
+    const tab = document.createElement('button');
+    tab.className = 'ctab'; tab.setAttribute('role', 'tab');
+    tab.style.setProperty('--c', COLORS[ci]);
+    tab.innerHTML = `<span class="tn">Card ${NAMES[ci]}</span><span class="ts"></span><span class="tw"></span>`;
+    tab.addEventListener('click', () => { S.focus = ci; render(); });
+    $('ctabs').appendChild(tab);
+    tabEls[ci] = tab;
     el.innerHTML = `
       <div class="chead">
         <span class="name">Card ${NAMES[ci]}</span>
@@ -502,11 +524,16 @@
       let info = `<b>${k}</b> spot${k===1?'':'s'}`;
       if (S.shown && c.active && k) info += ` · Hit <b>${c.hits}</b>`;
       cardEls[ci].querySelector('.info').innerHTML = info;
+      const t = tabEls[ci];
+      t.querySelector('.ts').innerHTML = !k ? 'no spots' : S.shown ? `Hit <b>${c.hits}</b> of ${k}` : `<b>${k}</b> spot${k===1?'':'s'}`;
+      t.classList.toggle('empty', !k);
+      t.classList.toggle('won', S.done && c.win > 0);
+      t.querySelector('.tw').textContent = c.win > 0 ? '+' + money(c.win) : '';
     });
   };
 
   function renderFocus(){
-    S.cards.forEach((c, ci) => cardEls[ci].classList.toggle('focus', ci === S.focus));
+    S.cards.forEach((c, ci) => { cardEls[ci].classList.toggle('focus', ci === S.focus); tabEls[ci].classList.toggle('sel', ci === S.focus); tabEls[ci].setAttribute('aria-selected', ci === S.focus); });
     const c = S.cards[S.focus], k = c.picks.size;
     $('payTitle').textContent = `Pays — Card ${NAMES[S.focus]}` + (k ? ` (${k} spot${k>1?'s':''}, ${money(c.bet)} bet)` : '');
     const pt = $('paytable');
