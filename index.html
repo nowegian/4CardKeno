@@ -227,14 +227,16 @@
           <div class="field">Variant<select id="msVar">
             <option value="3">3-Spot · 4-number master</option><option value="5">5-Spot · 6-number master</option>
             <option value="7" selected>7-Spot · 9-number master</option><option value="9">9-Spot · 11-number master</option></select></div>
-          <div class="field">Master block<select id="msZone">
+          <div class="field">Your numbers<select id="msZone">
+            <option value="mine" selected>My picks on Card A</option>
             <option value="example">Example</option><option value="tl">Top-Left zone</option><option value="tr">Top-Right zone</option>
             <option value="bl">Bottom-Left zone</option><option value="br">Bottom-Right zone</option><option value="ct">Center zone</option>
-            <option value="rand">Random quadrant</option><option value="any">Anywhere</option><option value="cardA">Card A's marks</option></select></div>
+            <option value="rand">Random quadrant</option><option value="any">Anywhere</option></select></div>
+          <div class="field" id="msExtraRow">Added numbers<select id="msExtra"><option value="touch">Touching my picks</option><option value="rand">Random</option></select></div>
           <div class="sum" id="msSum"></div>
           <button class="btn stbtn" id="msBtn">Build master wheel</button>
           <p class="help" style="margin-top:8px" id="msHelp"></p>
-          <p class="help">The master block is shaded on every card. Anchors (on all 4 cards) are outlined in orange. See the guarantee table under the cards.</p>
+          <p class="help">Card A plays exactly your numbers. Cards B–D each drop some of yours to swap in the added numbers, so together the 4 cards cover the whole master. Master numbers are shaded; anchors (on all 4 cards) are outlined in orange. Press Build again to re-roll the added numbers.</p>
         </div>
         <p class="help" style="margin-top:6px;font-style:italic">Every draw is random. A wheel changes how your wins are spread across cards, not the odds of any number coming up.</p>
       </div>
@@ -661,12 +663,37 @@
     9: 'I, J and K are on every card. If 9 of 11 hit, a 9/9 card needs your 2 misses to be one card\'s dropped pair. Otherwise the best card is 8/9. If 10 of 11 hit, a 9/9 is guaranteed unless the miss is an anchor (I, J or K).'
   };
 
+  // The player picks M.spots numbers; the wheel adds (M.n - M.spots) more so the 4 cards cover M.n.
+  // Added numbers take the first master positions (A, or A+B), so Card A — which drops exactly those — is the player's own picks.
+  const extraCount = v => MASTER[v].n - MASTER[v].spots;
+  function addExtras(picks, k, mode){
+    const have = new Set(picks), out = [];
+    if (mode === 'touch'){
+      const score = new Map();
+      picks.forEach(n => {
+        const r = Math.floor((n - 1) / 10), c = (n - 1) % 10;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++){
+          const rr = r + dr, cc = c + dc;
+          if ((dr || dc) && rr >= 0 && rr < 8 && cc >= 0 && cc < 10){
+            const m = num(rr, cc);
+            if (!have.has(m)) score.set(m, (score.get(m) || 0) + (dr && dc ? 1 : 2));
+          }
+        }
+      });
+      const ranked = shuffle([...score.keys()]).sort((a, b) => score.get(b) - score.get(a));
+      ranked.slice(0, k).forEach(n => { out.push(n); have.add(n); });
+    }
+    for (const n of randomSet(80)){ if (out.length >= k) break; if (!have.has(n)){ out.push(n); have.add(n); } }
+    return out.sort((a, b) => a - b);
+  }
+
   function updateMsSum(){
-    const v = +$('msVar').value, M = MASTER[v], an = masterAnchors(v);
-    const z = $('msZone').value;
+    const v = +$('msVar').value, M = MASTER[v], an = masterAnchors(v), k = extraCount(v);
+    const z = $('msZone').value, have = S.cards[0].picks.size;
+    $('msExtraRow').style.display = z === 'mine' ? '' : 'none';
     let ok = true;
-    if (z === 'cardA' && S.cards[0].picks.size !== M.n){ ok = false; $('msSum').textContent = `Mark exactly ${M.n} numbers on Card A (it has ${S.cards[0].picks.size}).`; }
-    else $('msSum').textContent = `${M.n}-number master → four ${M.spots}-spot cards · drops ${M.drops.map(d => d.map(i => LET[i]).join('+')).join(' / ')}` + (an.length ? ` · anchor${an.length > 1 ? 's' : ''} ${an.map(i => LET[i]).join(', ')}` : '');
+    if (z === 'mine' && have !== M.spots){ ok = false; $('msSum').textContent = `Mark exactly ${M.spots} numbers on Card A (it has ${have}). The wheel adds ${k} more to cover ${M.n}.`; }
+    else $('msSum').textContent = `Pick ${M.spots} → cover ${M.n} with 4 cards (${k} added) · drops ${M.drops.map(d => d.map(i => LET[i]).join('+')).join(' / ')}` + (an.length ? ` · anchor${an.length > 1 ? 's' : ''} ${an.map(i => LET[i]).join(', ')}` : '');
     $('msSum').style.color = ok ? '' : 'var(--red)';
     $('msBtn').disabled = !ok || S.playing || S.autoLeft > 0;
     $('msHelp').textContent = MS_TEXT[v];
@@ -679,11 +706,16 @@
     const v = +$('msVar').value, M = MASTER[v];
     let z = $('msZone').value, master;
     if (z === 'example') master = [...M.example];
-    else if (z === 'cardA'){ if (S.cards[0].picks.size !== M.n) return; master = [...S.cards[0].picks].sort((a, b) => a - b); }
+    else if (z === 'mine'){
+      if (S.cards[0].picks.size !== M.spots) return;
+      const mine = [...S.cards[0].picks].sort((a, b) => a - b);
+      master = [...addExtras(mine, extraCount(v), $('msExtra').value), ...mine];
+    }
     else { if (z === 'rand') z = ['tl','tr','bl','br'][rint(0, 3)]; master = placeBlock(M.shape, z); }
     S.cards.forEach((c, ci) => { c.picks = new Set(masterCard(v, master, ci)); c.active = true; });
     S.strategy = {type:'master', v, master};
-    finishStrategy(`Master Wheel ${M.label}: master ${fmt(master)} → four ${M.spots}-spot cards.`);
+    const k = extraCount(v);
+    finishStrategy(`Your ${M.spots} numbers ${fmt(master.slice(k))} + added ${fmt(master.slice(0, k))} → 4 cards covering ${M.n} numbers.`);
   }
 
   function finishStrategy(text){
@@ -708,8 +740,10 @@
     if (st.type === 'master'){
       const M = MASTER[st.v], an = new Set(masterAnchors(st.v));
       const mHit = st.master.filter(n => drawn.has(n)).length;
-      head = `<b>${M.n}-Number Master Wheel</b> (${M.spots}-spot) — master ` +
+      head = `<b>${M.spots}-Spot Wheel covering ${M.n}</b> — master ` +
         '<span class="chips">' + st.master.map((n, i) => `<i class="${drawn.has(n) ? 'on' : ''}${an.has(i) ? ' anc' : ''}"><sup>${LET[i]}</sup>${n}</i>`).join('') + '</span>';
+      { const k = extraCount(st.v);
+        head += `<div class="hl2">Your ${M.spots}: ${chips(st.master.slice(k), drawn)} &nbsp;+ added: ${chips(st.master.slice(0, k), drawn)} → ${M.n} numbers covered by 4 cards</div>`; }
       if (live){
         const g = guarantees(st.v).find(x => x.h === mHit);
         head += `<div class="hl2">Master caught <b>${mHit} / ${M.n}</b>.</div>`;
@@ -749,7 +783,7 @@
     }));
   }
 
-  ['msVar','msZone'].forEach(id => $(id).addEventListener('change', updateMsSum));
+  ['msVar','msZone','msExtra'].forEach(id => $(id).addEventListener('change', updateMsSum));
   $('msBtn').addEventListener('click', buildMaster);
   $('jsonBox').addEventListener('toggle', renderReport);
   $('jsonCopy').addEventListener('click', async () => {
@@ -763,7 +797,7 @@
   render = function(){
     _render(); markBoard(); updateMsSum(); renderReport();
     const busy = S.playing || S.autoLeft > 0;
-    ['msVar','msZone'].forEach(id => $(id).disabled = busy);
+    ['msVar','msZone','msExtra'].forEach(id => $(id).disabled = busy);
   };
   const _renderInfo = renderInfo;
   renderInfo = function(){ _renderInfo(); if (S.strategy) renderReport(); };
