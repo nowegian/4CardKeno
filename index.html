@@ -955,7 +955,15 @@
     }
     beep(i >= 0 ? 330 : 520, 0.05, 'triangle', 0.04);
     const have = S.base.filter(x => x != null).length;
-    applyChart(have === N ? `Base complete — Cards A–D filled from the ${chartTitle(S.chartKey)}.` : `Base ${have} / ${N} entered. Click the Master board to add #${S.base.indexOf(null) + 1}.`);
+    // Say exactly which cards the number went to, and which card(s) the chart blacks it out on
+    let where = '';
+    if (i < 0){
+      const pos = S.base.indexOf(n) + 1, drops = CHARTS[S.chartKey].drops;
+      const onC = NAMES.filter((_, ci) => !drops[ci].includes(pos)), offC = NAMES.filter((_, ci) => drops[ci].includes(pos));
+      where = `${n} is base #${pos} → Card${onC.length > 1 ? 's' : ''} ${onC.join(', ')}` +
+        (offC.length ? ` (the chart blacks out box #${pos} on Card ${offC.join(' and ')})` : ' (on every card)') + '. ';
+    } else where = `${n} removed. `;
+    applyChart(where + (have === N ? `Base complete — Cards A–D filled from the ${chartTitle(S.chartKey)}.` : `Base ${have} / ${N} entered; next is #${S.base.indexOf(null) + 1}.`));
   }
 
   // Quick-pick a base: random scatter, triplets (the booklet's "triplet pattern play"), or a tight irregular cluster
