@@ -208,8 +208,6 @@
   #denomRow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .stats em{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:1px}
   #sNet.up{color:var(--green)} #sNet.down{color:var(--red)}
-  .ctab .tog{position:absolute;left:-4px;top:-9px;font-size:9px;font-weight:800;letter-spacing:.5px;padding:1px 6px;border-radius:8px;background:#0008;color:var(--muted);border:1px solid var(--line);cursor:pointer}
-  .ctab .tog.on{background:var(--green);color:#03281a;border-color:var(--green)}
   .ctab.off{opacity:.38}
   .ctab.off.sel{opacity:.7}
   .mwins .mw.off{opacity:.35}
@@ -309,15 +307,12 @@
           <button class="btn betup" id="multBtn">BET UP</button>
           <div class="pips" id="pips"><i>1x</i><i>2x</i><i>3x</i><i>4x</i></div>
         </div>
-        <h3 style="margin-top:12px">Cards in play</h3>
-        <div class="row" id="onRow"></div>
         <div class="total" id="betMath"></div>
       </div>
 
       <div class="panel">
         <h3>Picks</h3>
-        <label class="chk"><input type="checkbox" id="sync"> Copy my marks to all 4 cards</label>
-        <div class="row" style="margin-top:10px">
+        <div class="row">
           <select id="qpCount" aria-label="Quick pick spots"></select>
           <button class="btn" id="qpBtn" style="flex:1">Quick Pick</button>
           <button class="btn" id="clearBtn">Clear</button>
@@ -402,15 +397,14 @@
     set(k,v){ try{ localStorage.setItem('keno4_'+k, JSON.stringify(v)); }catch(e){} }
   };
 
-  const savedOn = store.get('on', [true, true, true, true]);
   const S = {
     credits: store.get('cents', START),
     stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0,buyin:START}),
     denom: store.get('denom', 25), mult: store.get('mult', 1),
     speed: store.get('speed', 'Normal'),
-    wins: store.get('wins', []), sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
+    wins: store.get('wins', []), paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
     draw: [], shown: 0, done: false,
-    cards: [0,1,2,3].map(i => ({picks:new Set(), active: savedOn[i] !== false, bet: 0, hits:0, win:0}))
+    cards: [0,1,2,3].map(i => ({picks:new Set(), active: false, bet: 0, hits:0, win:0}))
   };
   if (!(S.speed in SPEEDS)) S.speed = 'Normal';
   if (!(S.credits > 0)) S.credits = START;
@@ -445,8 +439,7 @@
     const tab = document.createElement('button');
     tab.className = 'ctab'; tab.setAttribute('role', 'tab');
     tab.style.setProperty('--c', COLORS[ci]);
-    tab.innerHTML = `<span class="tn">Card ${NAMES[ci]}</span><span class="ts"></span><span class="tw"></span><span class="tog" role="switch" title="Turn Card ${NAMES[ci]} on or off"></span>`;
-    tab.querySelector('.tog').addEventListener('click', e => { e.stopPropagation(); toggleCard(ci); });
+    tab.innerHTML = `<span class="tn">Card ${NAMES[ci]}</span><span class="ts"></span><span class="tw"></span>`;
     tab.addEventListener('click', () => { S.focus = ci; S.master = false; render(); });
     $('ctabs').appendChild(tab);
     tabEls[ci] = tab;
@@ -455,7 +448,6 @@
         <span class="name">Card ${NAMES[ci]}</span>
         <span class="info"></span>
         <span class="cardbet"></span>
-        <button class="toggle" title="Turn this card on or off"></button>
       </div>
       <div class="grid g1"></div><div class="grid split g2"></div>
       <div class="badge"></div>`;
@@ -469,7 +461,6 @@
       (n <= 40 ? g1 : g2).appendChild(b);
       cells[ci][n] = b;
     }
-    el.querySelector('.toggle').addEventListener('click', e => { e.stopPropagation(); toggleCard(ci); });
     el.addEventListener('click', () => { if (S.focus !== ci){ S.focus = ci; renderFocus(); } });
     $('cards').appendChild(el);
     cardEls[ci] = el;
@@ -545,18 +536,6 @@
     });
     $('denomRow').appendChild(btn);
   });
-  [1, 2, 3, 4].forEach(k => {
-    const b = document.createElement('button');
-    b.className = 'btn'; b.dataset.on = k; b.style.flex = '1';
-    b.textContent = k === 4 ? 'All 4' : k === 1 ? 'A' : 'A–' + NAMES[k - 1];
-    b.title = k === 4 ? 'Play all four cards' : `Play ${k} card${k > 1 ? 's' : ''} (${NAMES.slice(0, k).join(', ')})`;
-    b.addEventListener('click', () => {
-      if (S.playing || S.autoLeft) return;
-      setOn([0, 1, 2, 3].map(i => i < k)); clearResults();
-      say(`Playing ${k} card${k > 1 ? 's' : ''} (${NAMES.slice(0, k).join(', ')}) for ${money(totalBet())}.`); render();
-    });
-    $('onRow').appendChild(b);
-  });
   $('multBtn').addEventListener('click', () => {
     if (S.playing || S.autoLeft) return;
     S.mult = S.mult % 4 + 1; applyBet(); beep(400 + S.mult * 120, 0.06, 'triangle');
@@ -577,21 +556,14 @@
 
   // ---------- Logic ----------
   function say(t, err){ const m = $('msg'); m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); }
-  // All four cards must be in play: total bet is always card bet × 4
-  // Play 1–4 cards: every card that is ON plays at the same bet, so total bet = card bet × cards on
-  const onCards = () => S.cards.filter(c => c.active);
-  function playable(){ const on = onCards(); return on.length && on.every(c => c.picks.size > 0) ? on : []; }
+  // Which cards play is decided by the marks: picking your own numbers, every card with numbers plays
+  // (empty cards are skipped and not charged). A Smart Chart always plays all 4 cards.
+  const chartOn = () => S.chartKey && S.chartKey !== 'none';
+  function syncActive(){ const all = chartOn(); S.cards.forEach(c => c.active = all || c.picks.size > 0); }
+  const onCards = () => { syncActive(); return S.cards.filter(c => c.active); };
+  const baseMissing = () => chartOn() ? S.base.filter(x => x == null).length : 0;
+  function playable(){ const on = onCards(); return on.length && !baseMissing() && on.every(c => c.picks.size > 0) ? on : []; }
   const cardBet = () => S.denom * S.mult, totalBet = () => cardBet() * onCards().length;
-  function setOn(list){ S.cards.forEach((c, i) => c.active = list[i]); store.set('on', S.cards.map(c => c.active)); }
-  function toggleCard(ci){
-    if (S.playing || S.autoLeft) return;
-    const c = S.cards[ci];
-    if (c.active && onCards().length === 1){ say('At least one card has to stay on.', true); return; }
-    setOn(S.cards.map((x, i) => i === ci ? !x.active : x.active));
-    clearResults(); beep(c.active ? 600 : 300, 0.06, 'triangle', 0.04);
-    say(`Card ${NAMES[ci]} ${c.active ? 'ON' : 'OFF'} — playing ${onCards().length} card${onCards().length > 1 ? 's' : ''} for ${money(totalBet())}.`);
-    render();
-  }
 
   function clearResults(){
     S.draw = []; S.shown = 0; S.done = false; S.lastWin = 0;
@@ -605,11 +577,7 @@
     const card = S.cards[ci];
     const had = card.picks.has(n);
     if (!had && card.picks.size >= 10){ say(`Card ${NAMES[ci]} already has 10 spots (the maximum).`, true); renderFocus(); return; }
-    const targets = S.sync ? [0,1,2,3] : [ci];
-    targets.forEach(i => {
-      const p = S.cards[i].picks;
-      if (had) p.delete(n); else if (p.size < 10) p.add(n);
-    });
+    if (had) card.picks.delete(n); else card.picks.add(n);
     beep(had ? 330 : 520, 0.05, 'triangle', 0.04);
     S.strategy = null; clearResults();
     const k = card.picks.size;
@@ -625,23 +593,18 @@
 
   function quickPick(){
     if (S.playing || S.autoLeft) return;
+    if (S.master || chartOn()) return;
     const k = +$('qpCount').value;
-    if (S.sync){
-      const set = randomSet(k);
-      S.cards.forEach(c => c.picks = new Set(set));
-      say(`Quick picked the same ${k} spots on all cards.`);
-    } else {
-      S.cards[S.focus].picks = new Set(randomSet(k));
-      say(`Quick picked ${k} spots on Card ${NAMES[S.focus]}.`);
-    }
+    S.cards[S.focus].picks = new Set(randomSet(k));
+    say(`Quick picked ${k} spots on Card ${NAMES[S.focus]}.`);
     S.strategy = null; clearResults(); beep(660, 0.08, 'triangle'); render();
   }
 
   function clearPicks(){
     if (S.playing || S.autoLeft) return;
-    const targets = S.sync ? S.cards : [S.cards[S.focus]];
-    targets.forEach(c => c.picks.clear());
-    S.strategy = null; clearResults(); say(S.sync ? 'All cards cleared.' : `Card ${NAMES[S.focus]} cleared.`); render();
+    if (S.master || chartOn()) return;
+    S.cards[S.focus].picks.clear();
+    S.strategy = null; clearResults(); say(`Card ${NAMES[S.focus]} cleared — it won't be played.`); render();
   }
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -729,11 +692,12 @@
   async function playRound(){
     const act = playable();
     const on = onCards();
-    if (!on.length){ say('Turn on at least one card.', true); return false; }
+    if (!on.length){ say('Mark spots on at least one card.', true); return false; }
+    if (baseMissing()){ say(`The ${chartTitle(S.chartKey)} plays all 4 cards — enter ${baseMissing()} more base number${baseMissing() > 1 ? 's' : ''} first.`, true); return false; }
     const empty = S.cards.map((c, i) => c.active && !c.picks.size ? NAMES[i] : null).filter(Boolean);
-    if (empty.length){ say(`Mark spots on Card ${empty.join(', ')} or turn ${empty.length > 1 ? 'them' : 'it'} off.`, true); return false; }
+    if (empty.length){ say(`Smart Charts play all 4 cards — Card ${empty.join(', ')} has no numbers.`, true); return false; }
     const cost = act.reduce((t, c) => t + c.bet, 0);
-    if (act.length !== on.length || cost !== cardBet() * act.length || act.some(c => c.bet !== cardBet())){ say('Bet error: total bet must equal card bet × cards in play.', true); return false; }
+    if (act.length !== on.length || cost !== cardBet() * act.length || act.some(c => c.bet !== cardBet())){ say('Bet error: total bet must equal card bet × cards played.', true); return false; }
     if (S.credits < cost){ say(`Not enough balance — this round costs ${money(cost)}.`, true); return false; }
 
     S.playing = true; clearResults();
@@ -824,16 +788,16 @@
   }
 
   let renderInfo = function(){
+    syncActive();
     S.cards.forEach((c, ci) => {
       const k = c.picks.size;
       let info = `<b>${k}</b> spot${k===1?'':'s'}`;
       if (S.shown && c.active && k) info += ` · Hit <b>${c.hits}</b>`;
       cardEls[ci].querySelector('.info').innerHTML = info;
       const t = tabEls[ci];
-      t.querySelector('.ts').innerHTML = !c.active ? 'not in play' : !k ? 'no spots' : S.shown ? `Hit <b>${c.hits}</b> of ${k}` : `<b>${k}</b> spot${k===1?'':'s'}`;
+      t.querySelector('.ts').innerHTML = !k ? 'not played' : S.shown && c.active ? `Hit <b>${c.hits}</b> of ${k}` : `<b>${k}</b> spot${k===1?'':'s'}`;
       t.classList.toggle('empty', c.active && !k);
       t.classList.toggle('off', !c.active);
-      const tg = t.querySelector('.tog'); tg.textContent = c.active ? 'ON' : 'OFF'; tg.classList.toggle('on', c.active); tg.setAttribute('aria-checked', c.active);
       t.classList.toggle('won', S.done && c.win > 0);
       t.querySelector('.tw').textContent = c.win > 0 ? '+' + money(c.win) : '';
     });
@@ -872,8 +836,7 @@
       el.classList.toggle('off', !c.active);
       el.classList.toggle('won', S.done && c.win > 0);
       el.querySelector('.badge').textContent = c.win > 0 ? `WIN ${money(c.win)}` : '';
-      el.querySelector('.cardbet').textContent = c.active ? `BET ${money(c.bet)}` : 'NOT IN PLAY';
-      const tg = el.querySelector('.toggle'); tg.textContent = c.active ? 'ON' : 'OFF'; tg.classList.toggle('on', c.active); tg.disabled = busy;
+      el.querySelector('.cardbet').textContent = c.active ? `BET ${money(c.bet)}` : 'NOT PLAYED';
       for (let n = 1; n <= 80; n++) cells[ci][n].classList.toggle('picked', c.picks.has(n));
     });
     renderStrip(); renderInfo(); renderFocus(); renderWins();
@@ -887,13 +850,11 @@
     $('multBtn').disabled = busy;
     $('multBtn').textContent = S.mult === 4 ? 'BET UP ↺' : 'BET UP';
     const nOn = onCards().length, ready = act.length > 0;
-    const emptyOn = S.cards.map((c, i) => c.active && !c.picks.size ? NAMES[i] : null).filter(Boolean);
-    $('betMath').innerHTML = `${money(S.denom)} × ${S.mult} credit${S.mult>1?'s':''} = <b>${money(cardBet())}</b> per card · × ${nOn} card${nOn>1?'s':''} = <b>${money(totalBet())}</b>` +
-      (ready ? '' : `<br><span style="color:var(--red)">Mark spots on Card ${emptyOn.join(', ')} or turn ${emptyOn.length > 1 ? 'them' : 'it'} off.</span>`);
-    document.querySelectorAll('[data-on]').forEach(b => {
-      const k = +b.dataset.on; b.disabled = busy;
-      b.classList.toggle('sel', S.cards.every((c, i) => c.active === (i < k)));
-    });
+    const playing = S.cards.map((c, i) => c.active ? NAMES[i] : null).filter(Boolean);
+    $('betMath').innerHTML = `${money(S.denom)} × ${S.mult} credit${S.mult>1?'s':''} = <b>${money(cardBet())}</b> per card` +
+      (nOn ? ` · × ${nOn} card${nOn>1?'s':''} (${playing.join(', ')}) = <b>${money(totalBet())}</b>` : '') +
+      (ready ? '' : `<br><span style="color:var(--red)">${!nOn ? 'Mark spots on a card to play it — you only pay for cards with numbers.'
+        : baseMissing() ? `Smart Chart plays all 4 cards — enter ${baseMissing()} more base number${baseMissing() > 1 ? 's' : ''}.` : 'A Smart Chart card has no numbers.'}</span>`);
     document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('sel', b.dataset.speed === S.speed));
     $('playBtn').disabled = busy || !ready || S.credits < totalBet();
     const ab = $('autoBtn');
@@ -904,12 +865,15 @@
     pb.classList.toggle('paused', !!S.paused);
     pb.textContent = S.paused ? '▶ RESUME' : '❚❚ PAUSE';
     ab.disabled = S.playing && S.autoLeft === 0;
-    ['qpBtn','clearBtn','sync','qpCount','autoCount'].forEach(id => $(id).disabled = busy);
-    $('qpBtn').textContent = S.sync ? 'Quick Pick all' : `Quick Pick ${NAMES[S.focus]}`;
-    $('clearBtn').textContent = S.sync ? 'Clear all' : `Clear ${NAMES[S.focus]}`;
-    $('pickHelp').textContent = S.sync
-      ? 'Marks you make on any card are copied to all four.'
-      : 'Each card has its own numbers. Click a card to select it for Quick Pick and Clear.';
+    const pickOff = busy || S.master || chartOn();
+    ['qpBtn','clearBtn','qpCount'].forEach(id => $(id).disabled = pickOff);
+    $('autoCount').disabled = busy;
+    $('qpBtn').textContent = S.master ? 'Quick Pick' : `Quick Pick ${NAMES[S.focus]}`;
+    $('clearBtn').textContent = S.master ? 'Clear' : `Clear ${NAMES[S.focus]}`;
+    $('pickHelp').textContent = chartOn()
+      ? 'A Smart Chart fills all 4 cards from your base numbers — use Quick Pick base / Clear base, or set Chart to "None" to pick your own.'
+      : S.master ? 'Open a card tab (A–D) to Quick Pick or Clear that card.'
+      : `Works on Card ${NAMES[S.focus]} only. Every card with numbers is played and charged; empty cards are skipped.`;
     $('sGames').textContent = S.stats.games.toLocaleString();
     const inn = S.stats.buyin, added = inn - START, net = S.credits - inn;
     $('sIn').textContent = money(inn);
@@ -967,7 +931,7 @@
   const chartCards = (k, base) => CHARTS[k].drops.map(d => base.filter((n, i) => n != null && !d.includes(i + 1)));
 
   // Base numbers are entered in order (#1, #2, …); a removed number leaves its slot open for the next click.
-  S.chartKey = store.get('chart', '7S'); if (!(S.chartKey in CHARTS) && S.chartKey !== 'none') S.chartKey = '7S';
+  S.chartKey = store.get('chart', 'none'); if (!(S.chartKey in CHARTS) && S.chartKey !== 'none') S.chartKey = 'none';
   S.base = [];
   function fitBase(){ const N = S.chartKey === 'none' ? 0 : CHARTS[S.chartKey].base; S.base = S.base.slice(0, N); while (S.base.length < N) S.base.push(null); }
   fitBase();
@@ -975,7 +939,6 @@
   function applyChart(msg){
     if (S.chartKey === 'none') return;
     chartCards(S.chartKey, S.base).forEach((set, ci) => { S.cards[ci].picks = new Set(set); });
-    S.sync = false; $('sync').checked = false;
     clearResults();
     if (msg) say(msg);
     render();
@@ -1235,15 +1198,6 @@
   $('pauseBtn').addEventListener('click', togglePause);
   $('qpBtn').addEventListener('click', quickPick);
   $('clearBtn').addEventListener('click', clearPicks);
-  $('sync').addEventListener('change', e => {
-    S.sync = e.target.checked;
-    if (S.sync){
-      const src = [...S.cards[S.focus].picks];
-      S.cards.forEach(c => c.picks = new Set(src));
-      S.strategy = null; clearResults(); say(`Card ${NAMES[S.focus]}'s marks copied to all cards.`);
-    }
-    render();
-  });
   $('addBtn').addEventListener('click', () => {
     if (S.playing) return;
     S.credits += 10000; S.stats.buyin += 10000; store.set('cents', S.credits); store.set('stats_usd', S.stats);

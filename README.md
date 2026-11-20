@@ -4,7 +4,7 @@ A single-page 4-Card Keno game. Open `index.html` in any browser — no build st
 
 ## How it plays
 - Four cards (A–D), each with its own 1–10 spots, played against **one shared draw of 20 numbers** from 1–80.
-- **Bet:** choose a denomination (1¢, 5¢, 10¢, 25¢, $1, $5) and 1x–4x credits per card. Play 1, 2, 3 or all 4 cards (Cards in play buttons, or the ON/OFF switch on each card tab). Every card in play uses the same bet: **total bet = card bet × cards in play**.
+- **Bet:** choose a denomination (1¢, 5¢, 10¢, 25¢, $1, $5) and 1x–4x credits per card. When you pick your own numbers, every card with numbers on it is played and charged; empty cards are skipped. A Smart Chart always plays all 4 cards. Every played card uses the same bet: **total bet = card bet × cards played**. Quick Pick and Clear work on the card tab you're on.
 - Each card is paid independently from the pay table × its bet.
 - Quick Pick, auto play (5–100 games), draw speeds, sound, and session stats.
 
