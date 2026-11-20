@@ -286,10 +286,6 @@
         <button class="play" id="playBtn">PLAY</button>
         <button class="btn addcash" id="addBtn">+ Add $100</button>
         <div class="row" style="margin-top:8px">
-          <select id="autoCount" aria-label="Auto play rounds">
-            <option value="5">5 games</option><option value="10" selected>10 games</option>
-            <option value="25">25 games</option><option value="50">50 games</option><option value="100">100 games</option>
-          </select>
           <button class="auto" id="autoBtn" style="flex:1;margin:0">AUTO PLAY</button>
         </div>
         <button class="auto pausebtn" id="pauseBtn" hidden>❚❚ PAUSE</button>
@@ -758,13 +754,14 @@
 
   async function autoPlay(){
     if (S.autoLeft > 0){ S.autoLeft = 0; S.paused = false; render(); return; }
-    S.autoLeft = +$('autoCount').value; S.paused = false; render();
+    // Runs until STOP (or until the balance can't cover the next bet); S.autoLeft is just the "running" flag
+    S.autoLeft = Infinity; S.autoPlayed = 0; S.paused = false; render();
     while (S.autoLeft > 0){
       await waitIfPaused();
       if (S.autoLeft <= 0) break;
       const ok = await playRound();
       if (!ok){ S.autoLeft = 0; break; }
-      S.autoLeft--; render();
+      S.autoPlayed++; render();
       if (S.autoLeft > 0) await sleep(S.lastTier === 'mega' ? 6000 : S.lastTier === 'big' ? 3500 : S.lastTier === 'nice' ? 1600 : SPEEDS[S.speed] ? 1100 : 400);   // let a big win sink in
     }
     S.autoLeft = 0; S.paused = false; render();
@@ -859,7 +856,7 @@
     $('playBtn').disabled = busy || !ready || S.credits < totalBet();
     const ab = $('autoBtn');
     ab.classList.toggle('running', S.autoLeft > 0);
-    ab.textContent = S.autoLeft > 0 ? `STOP (${S.autoLeft} left)` : 'AUTO PLAY';
+    ab.textContent = S.autoLeft > 0 ? `■ STOP AUTO (${S.autoPlayed} played)` : 'AUTO PLAY';
     const pb = $('pauseBtn');
     pb.hidden = !(S.autoLeft > 0);
     pb.classList.toggle('paused', !!S.paused);
@@ -867,7 +864,6 @@
     ab.disabled = S.playing && S.autoLeft === 0;
     const pickOff = busy || S.master || chartOn();
     ['qpBtn','clearBtn','qpCount'].forEach(id => $(id).disabled = pickOff);
-    $('autoCount').disabled = busy;
     $('qpBtn').textContent = S.master ? 'Quick Pick' : `Quick Pick ${NAMES[S.focus]}`;
     $('clearBtn').textContent = S.master ? 'Clear' : `Clear ${NAMES[S.focus]}`;
     $('pickHelp').textContent = chartOn()

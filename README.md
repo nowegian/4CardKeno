@@ -6,7 +6,7 @@ A single-page 4-Card Keno game. Open `index.html` in any browser — no build st
 - Four cards (A–D), each with its own 1–10 spots, played against **one shared draw of 20 numbers** from 1–80.
 - **Bet:** choose a denomination (1¢, 5¢, 10¢, 25¢, $1, $5) and 1x–4x credits per card. When you pick your own numbers, every card with numbers on it is played and charged; empty cards are skipped. A Smart Chart always plays all 4 cards. Every played card uses the same bet: **total bet = card bet × cards played**. Quick Pick and Clear work on the card tab you're on.
 - Each card is paid independently from the pay table × its bet.
-- Quick Pick, auto play (5–100 games), draw speeds, sound, and session stats.
+- Quick Pick, auto play (runs until you stop it), draw speeds, sound, and session stats.
 
 ## Smart Charts strategy
 Built from the *Mystic Keno Smart Charts™ – Four Card Keno Edition* (TheMysticGambler.com). Pick a chart, enter your base numbers (any numbers, in order #1, #2, …) by clicking the **Master** tab, and Cards A–D fill automatically, skipping each chart's blacked-out boxes.
