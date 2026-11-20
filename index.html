@@ -208,6 +208,11 @@
   #denomRow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .stats em{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:1px}
   #sNet.up{color:var(--green)} #sNet.down{color:var(--red)}
+  .ctab .tog{position:absolute;left:-4px;top:-9px;font-size:9px;font-weight:800;letter-spacing:.5px;padding:1px 6px;border-radius:8px;background:#0008;color:var(--muted);border:1px solid var(--line);cursor:pointer}
+  .ctab .tog.on{background:var(--green);color:#03281a;border-color:var(--green)}
+  .ctab.off{opacity:.38}
+  .ctab.off.sel{opacity:.7}
+  .mwins .mw.off{opacity:.35}
   aside{display:flex;flex-direction:column;gap:12px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:2px solid var(--line);border-radius:14px;padding:12px}
   .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -304,6 +309,8 @@
           <button class="btn betup" id="multBtn">BET UP</button>
           <div class="pips" id="pips"><i>1x</i><i>2x</i><i>3x</i><i>4x</i></div>
         </div>
+        <h3 style="margin-top:12px">Cards in play</h3>
+        <div class="row" id="onRow"></div>
         <div class="total" id="betMath"></div>
       </div>
 
@@ -395,6 +402,7 @@
     set(k,v){ try{ localStorage.setItem('keno4_'+k, JSON.stringify(v)); }catch(e){} }
   };
 
+  const savedOn = store.get('on', [true, true, true, true]);
   const S = {
     credits: store.get('cents', START),
     stats: store.get('stats_usd', {games:0,bet:0,won:0,best:0,buyin:START}),
@@ -402,7 +410,7 @@
     speed: store.get('speed', 'Normal'),
     wins: store.get('wins', []), sync: false, paused: false, master: true, strategy: null, focus: 0, playing: false, autoLeft: 0, lastWin: 0,
     draw: [], shown: 0, done: false,
-    cards: [0,1,2,3].map(i => ({picks:new Set(), active:true, bet: 0, hits:0, win:0}))
+    cards: [0,1,2,3].map(i => ({picks:new Set(), active: savedOn[i] !== false, bet: 0, hits:0, win:0}))
   };
   if (!(S.speed in SPEEDS)) S.speed = 'Normal';
   if (!(S.credits > 0)) S.credits = START;
@@ -411,7 +419,7 @@
   if (!DENOMS.includes(S.denom)) S.denom = 25;
   if (!(S.mult >= 1 && S.mult <= 4)) S.mult = 1;
   // One bet for every card: denomination × credits per card (in cents)
-  function applyBet(){ S.cards.forEach(c => { c.bet = S.denom * S.mult; c.active = true; }); store.set('denom', S.denom); store.set('mult', S.mult); }
+  function applyBet(){ S.cards.forEach(c => { c.bet = S.denom * S.mult; }); store.set('denom', S.denom); store.set('mult', S.mult); }
   applyBet();
 
   // ---------- Sound ----------
@@ -437,7 +445,8 @@
     const tab = document.createElement('button');
     tab.className = 'ctab'; tab.setAttribute('role', 'tab');
     tab.style.setProperty('--c', COLORS[ci]);
-    tab.innerHTML = `<span class="tn">Card ${NAMES[ci]}</span><span class="ts"></span><span class="tw"></span>`;
+    tab.innerHTML = `<span class="tn">Card ${NAMES[ci]}</span><span class="ts"></span><span class="tw"></span><span class="tog" role="switch" title="Turn Card ${NAMES[ci]} on or off"></span>`;
+    tab.querySelector('.tog').addEventListener('click', e => { e.stopPropagation(); toggleCard(ci); });
     tab.addEventListener('click', () => { S.focus = ci; S.master = false; render(); });
     $('ctabs').appendChild(tab);
     tabEls[ci] = tab;
@@ -446,6 +455,7 @@
         <span class="name">Card ${NAMES[ci]}</span>
         <span class="info"></span>
         <span class="cardbet"></span>
+        <button class="toggle" title="Turn this card on or off"></button>
       </div>
       <div class="grid g1"></div><div class="grid split g2"></div>
       <div class="badge"></div>`;
@@ -459,6 +469,7 @@
       (n <= 40 ? g1 : g2).appendChild(b);
       cells[ci][n] = b;
     }
+    el.querySelector('.toggle').addEventListener('click', e => { e.stopPropagation(); toggleCard(ci); });
     el.addEventListener('click', () => { if (S.focus !== ci){ S.focus = ci; renderFocus(); } });
     $('cards').appendChild(el);
     cardEls[ci] = el;
@@ -493,7 +504,7 @@
     const drawn = new Set(S.draw.slice(0, S.shown));
     let covered = 0, onAll = 0, hit = 0;
     for (let n = 1; n <= 80; n++){
-      const on = S.cards.map(c => c.picks.has(n));
+      const on = S.cards.map(c => c.active && c.picks.has(n));
       const cnt = on.filter(Boolean).length, b = mCells[n], ml = b.querySelector('.ml');
       if (cnt >= 2){ ml.className = 'ml star'; ml.textContent = '*'; }
       else { ml.className = 'ml'; ml.innerHTML = on.map((x, i) => x ? `<span style="color:${COLORS[i]}">${NAMES[i]}</span>` : '').join(''); }
@@ -513,9 +524,9 @@
     // Per-card results row + win badge on the master board
     masterEl.querySelector('.mwins').innerHTML = S.cards.map((c, i) => {
       const k = c.picks.size;
-      const h = S.shown && k ? `Hit ${c.hits}/${k}` : `${k} spot${k === 1 ? '' : 's'}`;
-      const p = S.done ? (c.win > 0 ? '+' + money(c.win) : '$0.00') : '';
-      return `<div class="mw${S.done && c.win > 0 ? ' win' : ''}" style="--c:${COLORS[i]}"><b class="l">${NAMES[i]}</b><span class="h">${h}</span><span class="p">${p}</span></div>`;
+      const h = !c.active ? 'OFF' : S.shown && k ? `Hit ${c.hits}/${k}` : `${k} spot${k === 1 ? '' : 's'}`;
+      const p = S.done && c.active ? (c.win > 0 ? '+' + money(c.win) : '$0.00') : '';
+      return `<div class="mw${S.done && c.win > 0 ? ' win' : ''}${c.active ? '' : ' off'}" style="--c:${COLORS[i]}"><b class="l">${NAMES[i]}</b><span class="h">${h}</span><span class="p">${p}</span></div>`;
     }).join('');
     const winners = S.cards.map((c, i) => c.win > 0 ? `<span style="color:${COLORS[i]}">${NAMES[i]}</span>` : '').filter(Boolean);
     masterEl.querySelector('.badge').innerHTML = total > 0
@@ -533,6 +544,18 @@
       S.denom = d; applyBet(); say(`Denomination ${money(d)} · card bet ${money(d * S.mult)} · total ${money(d * S.mult * 4)}.`); render();
     });
     $('denomRow').appendChild(btn);
+  });
+  [1, 2, 3, 4].forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'btn'; b.dataset.on = k; b.style.flex = '1';
+    b.textContent = k === 4 ? 'All 4' : k === 1 ? 'A' : 'A–' + NAMES[k - 1];
+    b.title = k === 4 ? 'Play all four cards' : `Play ${k} card${k > 1 ? 's' : ''} (${NAMES.slice(0, k).join(', ')})`;
+    b.addEventListener('click', () => {
+      if (S.playing || S.autoLeft) return;
+      setOn([0, 1, 2, 3].map(i => i < k)); clearResults();
+      say(`Playing ${k} card${k > 1 ? 's' : ''} (${NAMES.slice(0, k).join(', ')}) for ${money(totalBet())}.`); render();
+    });
+    $('onRow').appendChild(b);
   });
   $('multBtn').addEventListener('click', () => {
     if (S.playing || S.autoLeft) return;
@@ -555,8 +578,20 @@
   // ---------- Logic ----------
   function say(t, err){ const m = $('msg'); m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); }
   // All four cards must be in play: total bet is always card bet × 4
-  function playable(){ return S.cards.every(c => c.picks.size > 0) ? S.cards : []; }
-  const cardBet = () => S.denom * S.mult, totalBet = () => cardBet() * 4;
+  // Play 1–4 cards: every card that is ON plays at the same bet, so total bet = card bet × cards on
+  const onCards = () => S.cards.filter(c => c.active);
+  function playable(){ const on = onCards(); return on.length && on.every(c => c.picks.size > 0) ? on : []; }
+  const cardBet = () => S.denom * S.mult, totalBet = () => cardBet() * onCards().length;
+  function setOn(list){ S.cards.forEach((c, i) => c.active = list[i]); store.set('on', S.cards.map(c => c.active)); }
+  function toggleCard(ci){
+    if (S.playing || S.autoLeft) return;
+    const c = S.cards[ci];
+    if (c.active && onCards().length === 1){ say('At least one card has to stay on.', true); return; }
+    setOn(S.cards.map((x, i) => i === ci ? !x.active : x.active));
+    clearResults(); beep(c.active ? 600 : 300, 0.06, 'triangle', 0.04);
+    say(`Card ${NAMES[ci]} ${c.active ? 'ON' : 'OFF'} — playing ${onCards().length} card${onCards().length > 1 ? 's' : ''} for ${money(totalBet())}.`);
+    render();
+  }
 
   function clearResults(){
     S.draw = []; S.shown = 0; S.done = false; S.lastWin = 0;
@@ -693,10 +728,12 @@
 
   async function playRound(){
     const act = playable();
-    const empty = S.cards.map((c, i) => c.picks.size ? null : NAMES[i]).filter(Boolean);
-    if (empty.length){ say(`All 4 cards must be played — mark spots on Card ${empty.join(', ')}.`, true); return false; }
+    const on = onCards();
+    if (!on.length){ say('Turn on at least one card.', true); return false; }
+    const empty = S.cards.map((c, i) => c.active && !c.picks.size ? NAMES[i] : null).filter(Boolean);
+    if (empty.length){ say(`Mark spots on Card ${empty.join(', ')} or turn ${empty.length > 1 ? 'them' : 'it'} off.`, true); return false; }
     const cost = act.reduce((t, c) => t + c.bet, 0);
-    if (act.length !== 4 || cost !== totalBet() || S.cards.some(c => c.bet !== cardBet())){ say('Bet error: total bet must equal card bet × 4.', true); return false; }
+    if (act.length !== on.length || cost !== cardBet() * act.length || act.some(c => c.bet !== cardBet())){ say('Bet error: total bet must equal card bet × cards in play.', true); return false; }
     if (S.credits < cost){ say(`Not enough balance — this round costs ${money(cost)}.`, true); return false; }
 
     S.playing = true; clearResults();
@@ -793,8 +830,10 @@
       if (S.shown && c.active && k) info += ` · Hit <b>${c.hits}</b>`;
       cardEls[ci].querySelector('.info').innerHTML = info;
       const t = tabEls[ci];
-      t.querySelector('.ts').innerHTML = !k ? 'no spots' : S.shown ? `Hit <b>${c.hits}</b> of ${k}` : `<b>${k}</b> spot${k===1?'':'s'}`;
-      t.classList.toggle('empty', !k);
+      t.querySelector('.ts').innerHTML = !c.active ? 'not in play' : !k ? 'no spots' : S.shown ? `Hit <b>${c.hits}</b> of ${k}` : `<b>${k}</b> spot${k===1?'':'s'}`;
+      t.classList.toggle('empty', c.active && !k);
+      t.classList.toggle('off', !c.active);
+      const tg = t.querySelector('.tog'); tg.textContent = c.active ? 'ON' : 'OFF'; tg.classList.toggle('on', c.active); tg.setAttribute('aria-checked', c.active);
       t.classList.toggle('won', S.done && c.win > 0);
       t.querySelector('.tw').textContent = c.win > 0 ? '+' + money(c.win) : '';
     });
@@ -833,7 +872,8 @@
       el.classList.toggle('off', !c.active);
       el.classList.toggle('won', S.done && c.win > 0);
       el.querySelector('.badge').textContent = c.win > 0 ? `WIN ${money(c.win)}` : '';
-      el.querySelector('.cardbet').textContent = `BET ${money(c.bet)}`;
+      el.querySelector('.cardbet').textContent = c.active ? `BET ${money(c.bet)}` : 'NOT IN PLAY';
+      const tg = el.querySelector('.toggle'); tg.textContent = c.active ? 'ON' : 'OFF'; tg.classList.toggle('on', c.active); tg.disabled = busy;
       for (let n = 1; n <= 80; n++) cells[ci][n].classList.toggle('picked', c.picks.has(n));
     });
     renderStrip(); renderInfo(); renderFocus(); renderWins();
@@ -846,11 +886,16 @@
     document.querySelectorAll('#pips i').forEach((p, i) => p.classList.toggle('on', i < S.mult));
     $('multBtn').disabled = busy;
     $('multBtn').textContent = S.mult === 4 ? 'BET UP ↺' : 'BET UP';
-    const ready = act.length === 4;
-    $('betMath').innerHTML = `${money(S.denom)} × ${S.mult} credit${S.mult>1?'s':''} = <b>${money(cardBet())}</b> per card · × 4 cards = <b>${money(totalBet())}</b>` +
-      (ready ? '' : `<br><span style="color:var(--red)">Mark spots on all 4 cards to play.</span>`);
+    const nOn = onCards().length, ready = act.length > 0;
+    const emptyOn = S.cards.map((c, i) => c.active && !c.picks.size ? NAMES[i] : null).filter(Boolean);
+    $('betMath').innerHTML = `${money(S.denom)} × ${S.mult} credit${S.mult>1?'s':''} = <b>${money(cardBet())}</b> per card · × ${nOn} card${nOn>1?'s':''} = <b>${money(totalBet())}</b>` +
+      (ready ? '' : `<br><span style="color:var(--red)">Mark spots on Card ${emptyOn.join(', ')} or turn ${emptyOn.length > 1 ? 'them' : 'it'} off.</span>`);
+    document.querySelectorAll('[data-on]').forEach(b => {
+      const k = +b.dataset.on; b.disabled = busy;
+      b.classList.toggle('sel', S.cards.every((c, i) => c.active === (i < k)));
+    });
     document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('sel', b.dataset.speed === S.speed));
-    $('playBtn').disabled = busy || act.length !== 4 || S.credits < totalBet();
+    $('playBtn').disabled = busy || !ready || S.credits < totalBet();
     const ab = $('autoBtn');
     ab.classList.toggle('running', S.autoLeft > 0);
     ab.textContent = S.autoLeft > 0 ? `STOP (${S.autoLeft} left)` : 'AUTO PLAY';
@@ -929,7 +974,7 @@
 
   function applyChart(msg){
     if (S.chartKey === 'none') return;
-    chartCards(S.chartKey, S.base).forEach((set, ci) => { S.cards[ci].picks = new Set(set); S.cards[ci].active = true; });
+    chartCards(S.chartKey, S.base).forEach((set, ci) => { S.cards[ci].picks = new Set(set); });
     S.sync = false; $('sync').checked = false;
     clearResults();
     if (msg) say(msg);
@@ -1038,8 +1083,9 @@
   const letter = i => i < 26 ? LETTERS[i] : '#' + (i + 1);
 
   function analyzeWheel(){
-    const sets = S.cards.map(c => [...c.picks].sort((a, b) => a - b));
-    if (sets.some(s => !s.length)) return null;
+    const idx = [0, 1, 2, 3].filter(i => S.cards[i].active && S.cards[i].picks.size);
+    if (!idx.length || idx.length !== onCards().length) return null;
+    const sets = idx.map(i => [...S.cards[i].picks].sort((a, b) => a - b));
     const union = [...new Set(sets.flat())].sort((a, b) => a - b);
     const drops = sets.map(s => union.filter(n => !s.includes(n)));
     const anchors = union.filter(n => sets.every(s => s.includes(n)));
@@ -1049,7 +1095,7 @@
     let chart = null;
     if (S.chartKey !== 'none' && S.base.every(x => x != null)){
       const want = chartCards(S.chartKey, S.base).map(a => [...a].sort((x, y) => x - y).join(','));
-      if (want.every((w, i) => w === sets[i].join(','))) chart = S.chartKey;
+      if (idx.every((ci, j) => want[ci] === sets[j].join(','))) chart = S.chartKey;
     }
     let master, L;
     if (chart){ master = [...S.base]; L = new Map(master.map((n, i) => [n, '#' + (i + 1)])); }
@@ -1061,7 +1107,7 @@
     }
     const sizes = new Set(sets.map(s => s.length)), k = sets[0].length;
     const issues = chart ? [] : [S.chartKey === 'none' ? 'your own cards (no chart selected)' : 'these cards no longer match the ' + chartTitle(S.chartKey)];
-    return {sets, union, master, anchors, drops, L, k: sizes.size === 1 ? k : null, chart,
+    return {idx, sets, union, master, anchors, drops, L, k: sizes.size === 1 ? k : null, chart,
             valid: !!chart, issues, isWheel: union.length > Math.max(...sets.map(s => s.length))};
   }
 
@@ -1070,7 +1116,7 @@
   function guarantees(w){
     const n = w.master.length;
     if (n > 16) return null;
-    const bets = S.cards.map(c => c.bet);
+    const bets = w.idx.map(i => S.cards[i].bet);
     const key = JSON.stringify([w.master, w.sets, bets]);
     if (gCache.key === key) return gCache.rows;
     const idx = new Map(w.master.map((x, i) => [x, i]));
@@ -1082,14 +1128,14 @@
     for (let mask = 0; mask < (1 << n); mask++){
       const a = acc[pc(mask)];
       let best = 0, pay = 0, paying = 0, perfect = false;
-      for (let ci = 0; ci < 4; ci++){
+      for (let ci = 0; ci < cm.length; ci++){
         const hits = pc(mask & cm[ci]);
         best = Math.max(best, hits);
         if (hits === sz[ci]) perfect = true;
         const p = (PAY[sz[ci]][hits] || 0) * bets[ci];
         pay += p; if (p > 0) paying++;
       }
-      a.combos++; if (perfect) a.perfect++; if (paying === 4) a.allPay++;
+      a.combos++; if (perfect) a.perfect++; if (paying === cm.length) a.allPay++;
       a.minBest = Math.min(a.minBest, best); a.maxBest = Math.max(a.maxBest, best);
       a.minPay = Math.min(a.minPay, pay); a.maxPay = Math.max(a.maxPay, pay);
     }
@@ -1109,10 +1155,10 @@
     const C = w.chart ? CHARTS[w.chart] : null;
     return {
       strategyName: C ? chartTitle(w.chart) : `Custom cards covering ${w.union.length}`,
-      chartType: C ? C.type : 'Custom', totalCards: 4, spotsPerCard: w.k || w.sets.map(s => s.length),
+      chartType: C ? C.type : 'Custom', cardsInPlay: w.idx.length, spotsPerCard: w.k || w.sets.map(s => s.length),
       baseNumbers: C ? S.base : w.master, anchors: w.anchors,
-      cards: w.sets.map((s, ci) => Object.assign({cardId: ci + 1},
-        C ? {blackedOutPositions: C.drops[ci]} : {}, {dropped: w.drops[ci], finalSelection: s}))
+      cards: w.sets.map((s, j) => Object.assign({cardId: w.idx[j] + 1, card: NAMES[w.idx[j]]},
+        C ? {blackedOutPositions: C.drops[w.idx[j]]} : {}, {dropped: w.drops[j], finalSelection: s}))
     };
   }
 
@@ -1125,23 +1171,23 @@
     const pays = c => S.done ? (c.win ? `<b class="g">${money(c.win)}</b>` : '$0.00') : '—';
     const an = new Set(w.anchors), n = w.union.length;
     const mHit = w.union.filter(x => drawn.has(x)).length;
-    let head = `<b>${w.chart ? chartTitle(w.chart) : 'Your cards'}</b> — 4 cards${w.k ? ` × ${w.k} spots` : ''} cover <b>${n}</b> numbers: ` +
+    let head = `<b>${w.chart ? chartTitle(w.chart) : 'Your cards'}</b> — ${w.idx.length} card${w.idx.length > 1 ? 's' : ''} in play${w.k ? ` × ${w.k} spots` : ''} cover <b>${n}</b> numbers: ` +
       '<span class="chips">' + w.master.map(x => `<i class="${drawn.has(x) ? 'on' : ''}${an.has(x) ? ' anc' : ''}"><sup>${w.L.get(x)}</sup>${x}</i>`).join('') + '</span>';
     head += w.valid
-      ? `<div class="hl2" style="color:var(--green)">✓ Matches the ${chartTitle(w.chart)} · blacked out: ${w.drops.map((d, i) => NAMES[i] + ' ' + (d.map(x => w.L.get(x)).sort((p, q) => p.slice(1) - q.slice(1)).join('+') || '—')).join(' / ')}` +
+      ? `<div class="hl2" style="color:var(--green)">✓ Matches the ${chartTitle(w.chart)}${w.idx.length < 4 ? ` (playing ${w.idx.map(i => NAMES[i]).join(', ')} of A–D)` : ''} · blacked out: ${w.drops.map((d, j) => NAMES[w.idx[j]] + ' ' + (d.map(x => w.L.get(x)).sort((p, q) => p.slice(1) - q.slice(1)).join('+') || '—')).join(' / ')}` +
         (w.anchors.length ? ` · on every card: ${w.anchors.map(x => w.L.get(x)).join(', ')}` : '') + '</div>'
       : `<div class="hl2" style="color:var(--gold2)">${w.issues.join('; ')}. Guarantees below are still exact for these cards.</div>`;
     if (live) head += `<div class="hl2">Covered numbers caught: <b>${mHit} / ${n}</b>.</div>`;
     const rows = `<tr><th>Card</th><th>Leaves out</th><th>Plays</th><th>Hits</th><th>Pays</th></tr>` +
-      S.cards.map((c, ci) => {
-        const s = w.sets[ci], h = s.filter(x => drawn.has(x)).length, d = w.drops[ci];
+      w.idx.map((ci, j) => {
+        const c = S.cards[ci], s = w.sets[j], h = s.filter(x => drawn.has(x)).length, d = w.drops[j];
         return `<tr><td style="color:${COLORS[ci]};font-weight:800">${NAMES[ci]}</td><td>${d.length ? d.map(x => w.L.get(x)).join('+') + ' (' + d.join(', ') + ')' : '—'}</td>` +
                `<td>${chips(s, drawn)}</td><td>${live ? `<b>${h}</b> of ${s.length}` : '—'}</td><td>${pays(c)}</td></tr>`;
       }).join('');
     const G = guarantees(w), mh = live ? mHit : -1;
     $('repGuar').innerHTML = !G ? `<p class="help" style="margin-top:12px">Your cards cover ${n} numbers — too many to list every outcome (16 max).</p>` :
       `<h3 style="margin-top:14px">What each catch guarantees <span class="dim" style="text-transform:none;letter-spacing:0">(these exact cards at the current bet, every way it can happen)</span></h3>` +
-      `<div class="tscroll"><table class="gt"><tr><th>Covered hits</th><th>Best card</th><th>Top-prize card</th><th>All 4 pay</th><th>Total pays</th></tr>` +
+      `<div class="tscroll"><table class="gt"><tr><th>Covered hits</th><th>Best card</th><th>Top-prize card</th><th>All ${w.idx.length} pay</th><th>Total pays</th></tr>` +
       G.map(g => `<tr class="${g.h === mh ? 'cur' : ''}"><td>${g.h} of ${n}</td><td>${g.minBest === g.maxBest ? g.minBest : g.minBest + '–' + g.maxBest}${w.k ? ' of ' + w.k : ' hits'}</td>` +
         `<td>${pct(g.perfect)}</td><td>${pct(g.allPay)}</td><td>${g.minPay === g.maxPay ? money(g.minPay) : money(g.minPay) + '–' + money(g.maxPay)}</td></tr>`).join('') +
       `</table></div>`;
